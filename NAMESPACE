@@ -3,6 +3,7 @@
 export(fit_dose_response)
 export(plot_all_dose_responses)
 export(plot_dose_response)
+export(plot_multiple_compounds)
 export(ratio_dose_response)
 export(reshape_dr_table)
 export(save_multiple_sheets)
