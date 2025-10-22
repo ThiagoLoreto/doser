@@ -1,3 +1,84 @@
+#' Plot Multiple Dose-Response Curves in a Single Graph
+#'
+#' Creates composite plots showing multiple dose-response curves with advanced
+#' differentiation methods, professional styling, and flexible legend placement.
+#' Ideal for comparing multiple compounds or conditions in pharmacological studies.
+#'
+#' @param results List object returned by \code{\link{fit_dose_response}} containing
+#'   dose-response analysis results.
+#' @param compound_indices Numeric vector specifying which compounds to plot.
+#'   If NULL, plots all available compounds (default: NULL).
+#' @param y_limits Numeric vector of length 2 specifying y-axis limits (default: c(0, 150)).
+#' @param colors Character vector of colors for each compound. If NULL, generates
+#'   appropriate colors automatically (default: NULL).
+#' @param line_types Numeric vector of line types for each compound (default: NULL).
+#' @param point_shapes Numeric vector of point shapes for each compound (default: NULL).
+#' @param differentiation_method Character specifying how to differentiate curves:
+#'   "color", "linetype", "pointshape", or "combined" (default: "pointshape").
+#' @param legend_position Character specifying legend position: "bottomright", "bottom",
+#'   "bottomleft", "left", "topleft", "top", "topright", "right", or "outside"
+#'   (default: "outside").
+#' @param show_grid Logical indicating whether to show background grid (default: FALSE).
+#' @param show_legend Logical indicating whether to show legend (default: TRUE).
+#' @param save_plot Either a file path for saving the plot, or TRUE for automatic naming
+#'   (default: NULL, no saving).
+#' @param plot_width Plot width in inches for saved plots (default: 10).
+#' @param plot_height Plot height in inches for saved plots (default: 8).
+#' @param plot_dpi Resolution for saved raster images (default: 600).
+#' @param axis_label_cex Character expansion factor for axis labels (default: 1.4).
+#' @param axis_number_cex Character expansion factor for axis numbers (default: 1.4).
+#' @param auto_combine_threshold Numeric threshold for automatically switching to
+#'   "combined" differentiation method (default: 12).
+#' @param show_error_bars Logical indicating whether to show error bars (default: TRUE).
+#' @param error_bar_width Width of error bar ends (default: 0.03).
+#' @param error_bar_lwd Line width for error bars (default: 1).
+#' @param plot_title Character string for plot title (default: "Multiple Dose-Response Curves").
+#' @param legend_cex Character expansion factor for legend text (default: 0.8).
+#' @param legend_area_ratio Numeric ratio of plot area allocated to external legend
+#'   when legend_position = "outside" (default: 0.25).
+#' @param legend_point_cex Point size multiplier in legend (default: 1.0).
+#'
+#' @return Invisibly returns a list containing comprehensive plot metadata:
+#' \itemize{
+#'   \item \code{compound_names}: Names of plotted compounds
+#'   \item \code{compound_indices}: Indices of plotted compounds
+#'   \item \code{n_compounds}: Number of compounds plotted
+#'   \item \code{plot_limits}: List with x and y axis limits used
+#'   \item \code{differentiation_method}: Method used for curve differentiation
+#'   \item \code{styling}: List with colors, line types, and point shapes used
+#'   \item \code{error_bars}: Error bar configuration
+#'   \item \code{legend_position}: Legend position used
+#'   \item \code{legend_settings}: Legend configuration parameters
+#'   \item \code{plot_title}: Plot title used
+#'   \item \code{file_saved}: Path to saved file if plot was saved
+#'   \item \code{file_format}: Format of saved file
+#'   \item \code{plot_dimensions}: Dimensions of the plot (width, height, dpi)
+#'   \item \code{timestamp}: Time when plot was generated
+#' }
+#'
+#' @details
+#' This function creates sophisticated multi-curve dose-response plots with
+#' intelligent automatic styling and professional presentation. It automatically
+#' handles curve differentiation, legend placement, and output formatting for
+#' publication-quality figures.
+#'
+#' \strong{Automatic Features:}
+#' \itemize{
+#'   \item \strong{Smart Differentiation}: Auto-switches to combined methods for many compounds
+#'   \item \strong{Color Management}: Generates distinct color palettes based on compound count
+#'   \item \strong{Limit Calculation}: Automatically determines optimal axis limits from data
+#'   \item \strong{Error Bar Handling}: Only shows error bars when meaningful data exists
+#'   \item \strong{Layout Optimization}: Adjusts plot layout for external legends
+#' }
+#'
+#' \strong{Differentiation Methods:}
+#' \itemize{
+#'   \item \strong{color}: Uses distinct colors (optimal for 2-8 compounds)
+#'   \item \strong{linetype}: Uses line types 1-6 (repeats after 6 compounds)
+#'   \item \strong{pointshape}: Uses point shapes (optimal for 2-15 compounds)
+#'   \item \strong{combined}: Uses colors + line types + point shapes (best for 8+ compounds)
+#' }
+#'
 #' @examples
 #' \dontrun{
 #' # Example 1: Publication-ready multi-panel comparison
@@ -262,7 +343,7 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
     x_limits <- range(all_log_inhibitors, na.rm = TRUE)
   }
   
-  # Plot saving setup - CORREÇÃO AQUI
+  # Plot saving setup 
   plot_saved <- FALSE
   original_dev <- grDevices::dev.cur()
   filename <- NULL
@@ -291,12 +372,10 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
       file_ext <- "png"
     }
     
-    # CORREÇÃO: Fechar qualquer dispositivo gráfico aberto antes de salvar
     if (grDevices::dev.cur() != 1) {
       grDevices::dev.off()
     }
     
-    # CORREÇÃO: Usar chamadas de dispositivo mais robustas
     switch(file_ext,
            png = grDevices::png(filename, width = plot_width, height = plot_height, 
                                 units = "in", res = plot_dpi, bg = "white"),
