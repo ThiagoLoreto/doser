@@ -48,12 +48,12 @@ compound with consistent formatting and automatic file naming.
 
 \strong{Key Features:}
 \itemize{
-\item \textbf{Batch Processing}: Automatically generates plots for multiple compounds
-\item \textbf{Automatic File Management}: Creates organized directory structure
-\item \textbf{Consistent Formatting}: Applies uniform styling across all plots
-\item \textbf{Flexible Compound Selection}: Plot all compounds or specific subsets
-\item \textbf{Multiple Output Formats}: Supports various image formats for different use cases
-\item \textbf{Progress Tracking}: Provides real-time progress feedback
+\item Batch Processing: Automatically generates plots for multiple compounds
+\item Automatic File Management: Creates organized directory structure
+\item Consistent Formatting: Applies uniform styling across all plots
+\item Flexible Compound Selection: Plot all compounds or specific subsets
+\item Multiple Output Formats: Supports various image formats for different use cases
+\item Progress Tracking: Provides real-time progress feedback
 }
 
 \strong{Automatic File Naming:}

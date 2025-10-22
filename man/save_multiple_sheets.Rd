@@ -42,12 +42,12 @@ scientific and pharmacological data presentation. Key features include:
 
 \strong{Advanced Formatting Features:}
 \itemize{
-\item \textbf{Multiple Sheets}: Each data frame becomes a separate worksheet
-\item \textbf{Row Name Preservation}: Automatically includes row names in a protected "RowNames" column
-\item \textbf{Decimal Customization}: Converts decimal separators (point to comma) with precision control
-\item \textbf{Selective Rounding}: Applies rounding only to specified worksheets
-\item \textbf{Scientific Notation}: Preserves scientific notation when present
-\item \textbf{Protected Columns}: Never modifies the "RowNames" column during formatting
+\item Multiple Sheets: Each data frame becomes a separate worksheet
+\item Row Name Preservation: Automatically includes row names in a protected "RowNames" column
+\item Decimal Customization: Converts decimal separators (point to comma) with precision control
+\item Selective Rounding: Applies rounding only to specified worksheets
+\item Scientific Notation: Preserves scientific notation when present
+\item Protected Columns: Never modifies the "RowNames" column during formatting
 }
 
 \strong{Automatic Sheet Naming:}
