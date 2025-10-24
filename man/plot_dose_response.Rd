@@ -9,7 +9,7 @@ plot_dose_response(
   compound_index = 1,
   y_limits = c(0, 150),
   point_color = "black",
-  line_color = "black",
+  line_color = "red",
   ic50_line_color = "gray",
   point_size = 1,
   line_width = 2,
@@ -22,7 +22,11 @@ plot_dose_response(
   plot_height = 8,
   plot_dpi = 600,
   axis_label_cex = 1.4,
-  axis_number_cex = 1.4
+  axis_number_cex = 1.4,
+  x_axis_title = NULL,
+  y_axis_title = NULL,
+  enforce_bottom_threshold = NULL,
+  bottom_threshold = 60
 )
 }
 \arguments{
@@ -35,7 +39,7 @@ dose-response analysis results.}
 
 \item{point_color}{Color for data points (default: "black").}
 
-\item{line_color}{Color for fitted curve (default: "black").}
+\item{line_color}{Color for fitted curve (default: "red").}
 
 \item{ic50_line_color}{Color for IC50 vertical line (default: "gray").}
 
@@ -63,6 +67,12 @@ dose-response analysis results.}
 \item{axis_label_cex}{Character expansion factor for axis labels (default: 1.4).}
 
 \item{axis_number_cex}{Character expansion factor for axis numbers (default: 1.4).}
+
+\item{x_axis_title}{Custom x-axis title. If NULL, uses default expression
+(default: NULL).}
+
+\item{y_axis_title}{Custom y-axis title. If NULL, uses default based on
+normalization status (default: NULL).}
 }
 \value{
 Invisibly returns a list containing plot metadata:

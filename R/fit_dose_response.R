@@ -19,6 +19,13 @@
 #' @param bottom_threshold Numeric value specifying the Bottom threshold when
 #'   `enforce_bottom_threshold = TRUE`. Curves with Bottom ? this value will have
 #'   IC50 values set to NA. Default is 60.
+#' @param bottom_limit Logical indicating whether to apply an upper limit constraint 
+#'   to the Bottom parameter during biological plausibility checks. When TRUE 
+#'   (default), Bottom values above 600 are considered biologically implausible 
+#'   and corrected. When FALSE, no upper limit is applied to Bottom values.
+#' @param r_squared_threshold Numeric value between 0 and 1 specifying the R² cutoff 
+#'   for curve quality assessment. Curves with R² below this value will be flagged 
+#'   as "Low R²" in the quality assessment (default: 0.5).
 #'
 #' @return A list containing the following components:
 #' \itemize{
@@ -128,7 +135,8 @@
 
 
 fit_dose_response <- function(data, output_file = NULL, normalize = FALSE, verbose = TRUE, 
-                              enforce_bottom_threshold = FALSE, bottom_threshold = 60) {
+                              enforce_bottom_threshold = FALSE, bottom_threshold = 60,
+                              bottom_limit = TRUE, r_sqr_threshold = 0.5) {
   
   # Check and load required packages
   required_packages <- c("dplyr", "stats", "graphics", "grDevices")
@@ -222,7 +230,12 @@ fit_dose_response <- function(data, output_file = NULL, normalize = FALSE, verbo
     exp_max <- max(responses, na.rm = TRUE)
     
     # Biological limits
-    bottom_limits <- c(-100, 600)
+    bottom_limits <- if (bottom_limit) {
+      c(-100, 600)  # Com limite superior
+    } else {
+      c(-100, Inf)  # Sem limite superior
+    }
+    
     top_limits <- c(0, 700)
     logIC50_limits <- c(-10, 2)
     
@@ -420,8 +433,8 @@ fit_dose_response <- function(data, output_file = NULL, normalize = FALSE, verbo
       quality_flags <- character()
       if (abs(max_slope) < 5) quality_flags <- c(quality_flags, "Very shallow slope")
       else if (abs(max_slope) < 15) quality_flags <- c(quality_flags, "Shallow slope")
-      if (abs(span) < 20) quality_flags <- c(quality_flags, "Small span (<20%)")
-      if (gof_results$R_squared < 0.5) quality_flags <- c(quality_flags, "Low R2")
+      if (abs(span) < 20) quality_flags <- c(quality_flags, "Small span")
+      if (gof_results$R_squared < r_sqr_threshold) quality_flags <- c(quality_flags, "Low R²")
       if (!is.null(plausibility_check) && plausibility_check$needs_correction) {
         quality_flags <- c(quality_flags, "Parameters corrected (biologically implausible)")
       }
@@ -556,6 +569,7 @@ fit_dose_response <- function(data, output_file = NULL, normalize = FALSE, verbo
       gof <- result$goodness_of_fit
       ci <- result$confidence_intervals
       
+      # NOVA LÓGICA: Aplicar threshold se solicitado
       apply_threshold <- FALSE
       if (enforce_bottom_threshold && !is.na(params[1]) && params[1] >= bottom_threshold) {
         apply_threshold <- TRUE
@@ -604,6 +618,7 @@ fit_dose_response <- function(data, output_file = NULL, normalize = FALSE, verbo
   # Identificar compostos afetados pelo threshold - CORRIGIDO
   threshold_affected <- character()
   if (enforce_bottom_threshold) {
+    # CORREÇÃO: Identifica compostos onde Bottom ≥ threshold E IC50 é NA (devido ao threshold)
     threshold_affected <- summary_table$Compound[!is.na(summary_table$Bottom) & 
                                                    summary_table$Bottom >= bottom_threshold &
                                                    is.na(summary_table$IC50)]
@@ -620,27 +635,29 @@ fit_dose_response <- function(data, output_file = NULL, normalize = FALSE, verbo
     cat("DOSE-RESPONSE ANALYSIS COMPLETED SUCCESSFULLY!\n")
     cat(strrep("=", 50), "\n")
     cat("SUMMARY STATISTICS:\n")
-    cat("  . Compounds analyzed: ", total, "\n")
-    cat("  . Successful fits: ", successful, " (", success_rate, "%)\n", sep = "")
-    cat("  . Failed fits: ", total - successful, "\n")
+    cat("  • Compounds analyzed: ", total, "\n")
+    cat("  • Successful fits: ", successful, " (", success_rate, "%)\n", sep = "")
+    cat("  • Failed fits: ", total - successful, "\n")
     
     if (enforce_bottom_threshold && threshold_count > 0) {
-      cat("  . IC50 values excluded (Bottom ?", bottom_threshold, "): ", threshold_count, "\n", sep = "")
+      cat("  • IC50 values excluded (Bottom ≥", bottom_threshold, "): ", threshold_count, "\n", sep = "")
+      
+      # Mostrar quais compostos foram afetados
       cat("\nCOMPOUNDS WITH EXCLUDED IC50 VALUES:\n")
       for (i in seq_along(threshold_affected)) {
-        cat("  . ", threshold_affected[i], " (Bottom = ", 
+        cat("  • ", threshold_affected[i], " (Bottom = ", 
             round(summary_table$Bottom[summary_table$Compound == threshold_affected[i]], 1), ")\n", sep = "")
       }
     }
     
-    cat("  . Problematic curves: ", sum(grepl("shallow|Low R2|Small span", summary_table$Curve_Quality)), "\n")
+    cat("  • Problematic curves: ", sum(grepl("shallow|Low R²|Small span", summary_table$Curve_Quality)), "\n")
     
     if ("Curve_Quality" %in% names(summary_table)) {
       cat("\nCURVE QUALITY DISTRIBUTION:\n")
       quality_counts <- table(summary_table$Curve_Quality)
       for (quality in names(sort(quality_counts, decreasing = TRUE))) {
         count <- quality_counts[quality]
-        cat("  . ", sprintf("%-35s: %d (%.1f%%)", quality, count, count/total*100), "\n")
+        cat("  • ", sprintf("%-35s: %d (%.1f%%)", quality, count, count/total*100), "\n")
       }
     }
     cat(strrep("=", 50), "\n\n")
@@ -683,4 +700,3 @@ fit_dose_response <- function(data, output_file = NULL, normalize = FALSE, verbo
     }
   )
 }
-

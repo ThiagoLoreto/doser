@@ -1,6 +1,6 @@
 Package: doser
 Title: Comprehensive Dose-Response Analysis Toolkit
-Version: 0.0.0.9000
+Version: 1.0.0
 Authors@R: 
     person("Thiago", "Loreto Matos", 
            email = "thiagoloreto@gmail.com", 

@@ -10,7 +10,9 @@ fit_dose_response(
   normalize = FALSE,
   verbose = TRUE,
   enforce_bottom_threshold = FALSE,
-  bottom_threshold = 60
+  bottom_threshold = 60,
+  bottom_limit = TRUE,
+  r_sqr_threshold = 0.5
 )
 }
 \arguments{
@@ -34,6 +36,15 @@ for curves where the Bottom parameter exceeds a threshold. Default is FALSE.}
 \item{bottom_threshold}{Numeric value specifying the Bottom threshold when
 \code{enforce_bottom_threshold = TRUE}. Curves with Bottom ? this value will have
 IC50 values set to NA. Default is 60.}
+
+\item{bottom_limit}{Logical indicating whether to apply an upper limit constraint
+to the Bottom parameter during biological plausibility checks. When TRUE
+(default), Bottom values above 600 are considered biologically implausible
+and corrected. When FALSE, no upper limit is applied to Bottom values.}
+
+\item{r_squared_threshold}{Numeric value between 0 and 1 specifying the R² cutoff
+for curve quality assessment. Curves with R² below this value will be flagged
+as "Low R²" in the quality assessment (default: 0.5).}
 }
 \value{
 A list containing the following components:

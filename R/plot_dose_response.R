@@ -2,13 +2,12 @@
 #'
 #' Generates publication-quality dose-response plots from analysis results.
 #' Supports error bars, fitted curves, IC50 lines, and multiple export formats.
-#'
 #' @param results List object returned by \code{\link{fit_dose_response}} containing
 #'   dose-response analysis results.
 #' @param compound_index Numeric index specifying which compound to plot (default: 1).
 #' @param y_limits Numeric vector of length 2 specifying y-axis limits (default: c(0, 150)).
 #' @param point_color Color for data points (default: "black").
-#' @param line_color Color for fitted curve (default: "black").
+#' @param line_color Color for fitted curve (default: "red").
 #' @param ic50_line_color Color for IC50 vertical line (default: "gray").
 #' @param point_size Size multiplier for data points (default: 1).
 #' @param line_width Line width for fitted curve (default: 2).
@@ -23,6 +22,10 @@
 #' @param plot_dpi Resolution for saved raster images (default: 600).
 #' @param axis_label_cex Character expansion factor for axis labels (default: 1.4).
 #' @param axis_number_cex Character expansion factor for axis numbers (default: 1.4).
+#' @param x_axis_title Custom x-axis title. If NULL, uses default expression 
+#'   (default: NULL).
+#' @param y_axis_title Custom y-axis title. If NULL, uses default based on 
+#'   normalization status (default: NULL).
 #'
 #' @return Invisibly returns a list containing plot metadata:
 #' \itemize{
@@ -137,73 +140,119 @@
 
 
 
+
 plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150), 
-                               point_color = "black", line_color = "black", 
+                               point_color = "black", line_color = "red", 
                                ic50_line_color = "gray", point_size = 1, 
                                line_width = 2, error_bar_width = 0.01,
                                show_ic50_line = TRUE, show_legend = TRUE,
                                show_grid = FALSE, save_plot = NULL, 
                                plot_width = 10, plot_height = 8, plot_dpi = 600,
-                               axis_label_cex = 1.4, axis_number_cex = 1.4) {
+                               axis_label_cex = 1.4, axis_number_cex = 1.4,
+                               x_axis_title = NULL, y_axis_title = NULL,
+                               enforce_bottom_threshold = NULL, bottom_threshold = 60) {
   
-  # Enhanced input validation
-  if (missing(results)) {
-    stop("Argument 'results' is required")
+  # Input validation function
+  validate_inputs <- function(results, compound_index) {
+    if (missing(results)) {
+      stop("Argument 'results' is required")
+    }
+    
+    if (!is.list(results) || !"detailed_results" %in% names(results)) {
+      stop("Invalid 'results' object. Must be output from fit function")
+    }
+    
+    if (length(results$detailed_results) == 0) {
+      stop("No compounds found in results object")
+    }
+    
+    if (compound_index < 1 || compound_index > length(results$detailed_results)) {
+      stop("Compound index ", compound_index, " out of range. Must be between 1 and ", 
+           length(results$detailed_results))
+    }
   }
   
-  if (!is.list(results) || !"detailed_results" %in% names(results)) {
-    stop("Invalid 'results' object. Must be output from analyze_dose_response_complete()")
-  }
+  validate_inputs(results, compound_index)
   
-  if (length(results$detailed_results) == 0) {
-    stop("No compounds found in results object")
-  }
-  
-  if (compound_index < 1 || compound_index > length(results$detailed_results)) {
-    stop("Compound index ", compound_index, " out of range. Must be between 1 and ", 
-         length(results$detailed_results))
-  }
-  
-  # Extract and validate data
+  # Extract compound data
   result <- results$detailed_results[[compound_index]]
+  
   if (!is.list(result) || !"data" %in% names(result)) {
     stop("Invalid result structure for compound ", compound_index)
   }
   
+  # Use threshold settings from results if not explicitly provided
+  if (is.null(enforce_bottom_threshold)) {
+    enforce_bottom_threshold <- if (!is.null(results$threshold_settings)) {
+      results$threshold_settings$enforce_bottom_threshold
+    } else {
+      FALSE
+    }
+  }
+  
+  # Clean and validate data
   clean_data <- stats::na.omit(result$data)
-  if (nrow(clean_data) == 0) {
-    stop("No valid data points available for plotting after removing NAs")
+  required_cols <- c("log_inhibitor", "response")
+  if (nrow(clean_data) == 0 || !all(required_cols %in% names(clean_data))) {
+    stop("No valid data points available or missing required columns")
   }
   
-  # Enhanced data validation
-  if (!all(c("log_inhibitor", "response") %in% names(clean_data))) {
-    stop("Data must contain 'log_inhibitor' and 'response' columns")
+  # Calculate summary statistics (mean ± SD per concentration)
+  calculate_summary_stats <- function(data) {
+    summary_data <- do.call(rbind, lapply(split(data, data$log_inhibitor), function(sub_df) {
+      data.frame(
+        log_inhibitor = unique(sub_df$log_inhibitor),
+        mean_response = mean(sub_df$response, na.rm = TRUE),
+        sd_response = sd(sub_df$response, na.rm = TRUE),
+        n_replicates = nrow(sub_df)
+      )
+    }))
+    
+    stats::na.omit(summary_data)
   }
   
-  # Calculate summary statistics using efficient methods
-  summary_data <- do.call(rbind, lapply(split(clean_data, clean_data$log_inhibitor), function(sub_df) {
-    data.frame(
-      log_inhibitor = unique(sub_df$log_inhibitor),
-      mean_response = mean(sub_df$response, na.rm = TRUE),
-      sd_response = sd(sub_df$response, na.rm = TRUE),
-      n_replicates = nrow(sub_df)
-    )
-  }))
-  
-  summary_data <- stats::na.omit(summary_data)
+  summary_data <- calculate_summary_stats(clean_data)
   
   if (nrow(summary_data) == 0) {
     stop("No valid summary data available for plotting")
   }
   
-  # Process compound name
+  # Extract compound name (remove plate info if present)
   compound_name_display <- strsplit(result$compound, " \\| ")[[1]][1]
   
-  # Enhanced plot saving with multiple format support
-  plot_device <- NULL
-  original_dev <- grDevices::dev.cur()
+  # Setup plot configuration with flexible axis titles
+  setup_plot_config <- function() {
+    x_lab <- if (!is.null(x_axis_title)) {
+      x_axis_title
+    } else {
+      expression(paste("Log"[10], " Concentration [M]"))
+    }
+    
+    y_lab <- if (!is.null(y_axis_title)) {
+      y_axis_title
+    } else {
+      ifelse(results$normalized, "Normalized BRET ratio [%]", "BRET ratio")
+    }
+    
+    list(
+      x_lab = x_lab,
+      y_lab = y_lab,
+      point_color = point_color,
+      line_color = line_color,
+      point_size = point_size,
+      line_width = line_width,
+      error_bar_width = error_bar_width,
+      axis_label_cex = axis_label_cex,
+      axis_number_cex = axis_number_cex
+    )
+  }
   
-  if (!is.null(save_plot)) {
+  plot_config <- setup_plot_config()
+  
+  # File saving setup with multiple format support
+  setup_plot_device <- function() {
+    if (is.null(save_plot)) return(NULL)
+    
     if (is.character(save_plot)) {
       filename <- save_plot
     } else if (is.logical(save_plot) && save_plot) {
@@ -213,13 +262,13 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
       stop("save_plot must be either a file path or TRUE for auto-naming")
     }
     
-    # Create directory if it doesn't exist
+    # Create directory if needed
     plot_dir <- dirname(filename)
     if (plot_dir != "." && !dir.exists(plot_dir)) {
       dir.create(plot_dir, recursive = TRUE, showWarnings = FALSE)
     }
     
-    # Determine format from extension with fallback
+    # Determine file format with fallback to PNG
     file_ext <- tolower(tools::file_ext(filename))
     supported_formats <- c("png", "jpg", "jpeg", "tiff", "pdf", "svg")
     
@@ -229,128 +278,109 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
       file_ext <- "png"
     }
     
-    # Open appropriate device with professional settings
-    switch(file_ext,
-           png = grDevices::png(filename, width = plot_width, height = plot_height, 
-                                units = "in", res = plot_dpi, bg = "white"),
-           jpg =,
-           jpeg = grDevices::jpeg(filename, width = plot_width, height = plot_height, 
-                                  units = "in", res = plot_dpi, quality = 90, bg = "white"),
-           tiff = grDevices::tiff(filename, width = plot_width, height = plot_height, 
-                                  units = "in", res = plot_dpi, compression = "lzw", bg = "white"),
-           pdf = grDevices::pdf(filename, width = plot_width, height = plot_height, 
-                                bg = "white", pointsize = 12),
-           svg = grDevices::svg(filename, width = plot_width, height = plot_height, 
-                                bg = "white")
+    # Open appropriate graphics device
+    device_func <- switch(file_ext,
+                          png = function() grDevices::png(filename, width = plot_width, height = plot_height, 
+                                                          units = "in", res = plot_dpi, bg = "white"),
+                          jpg =, jpeg = function() grDevices::jpeg(filename, width = plot_width, height = plot_height, 
+                                                                   units = "in", res = plot_dpi, quality = 90, bg = "white"),
+                          tiff = function() grDevices::tiff(filename, width = plot_width, height = plot_height, 
+                                                            units = "in", res = plot_dpi, compression = "lzw", bg = "white"),
+                          pdf = function() grDevices::pdf(filename, width = plot_width, height = plot_height, 
+                                                          bg = "white", pointsize = 12),
+                          svg = function() grDevices::svg(filename, width = plot_width, height = plot_height, 
+                                                          bg = "white")
     )
     
-    plot_device <- grDevices::dev.cur()
+    device_func()
+    return(list(device = grDevices::dev.cur(), filename = filename))
+  }
+  
+  # Setup plot device and auto-close on exit
+  original_dev <- grDevices::dev.cur()
+  plot_device_info <- setup_plot_device()
+  
+  if (!is.null(plot_device_info)) {
     on.exit({
-      if (grDevices::dev.cur() == plot_device) {
+      if (grDevices::dev.cur() == plot_device_info$device) {
         grDevices::dev.off()
-        # Restore original device if it was different
         if (grDevices::dev.cur() == 1 && original_dev > 1) {
           grDevices::dev.set(original_dev)
         }
-        cat("Plot saved as:", normalizePath(filename), "\n")
+        cat("Plot saved as:", normalizePath(plot_device_info$filename), "\n")
       }
     })
   }
   
-  plot_config <- list(
-    x_lab = expression(paste("Log"[10], " Concentration [M]")),
-    y_lab = ifelse(results$normalized, 
-                   "Normalized BRET ratio [%]", 
-                   "BRET ratio"),
-    point_color = point_color,
-    line_color = line_color,
-    point_size = point_size,
-    line_width = line_width,
-    error_bar_width = error_bar_width,
-    axis_label_cex = axis_label_cex,
-    axis_number_cex = axis_number_cex
-  )
-  
-  # Enhanced core plotting functions
+  # Core plotting functions
   create_base_plot <- function(title_suffix = "") {
     main_title <- paste(compound_name_display, title_suffix)
     
-    # Professional margins and settings
+    # Professional plot settings
     old_par <- graphics::par(
-      mar = c(4.5, 5, 3.5, 1.5),  # Bottom, Left, Top, Right margins
-      mgp = c(2.8, 0.8, 0),       # Axis title, labels, line
-      las = 1                      # Horizontal labels
+      mar = c(4.5, 5, 3.5, 1.5),  # margins: bottom, left, top, right
+      mgp = c(2.8, 0.8, 0),       # axis title, labels, line
+      las = 1                      # horizontal labels
     )
     on.exit(graphics::par(old_par))
     
-    # Create base plot with professional styling
+    # Create base scatter plot
     graphics::plot(summary_data$log_inhibitor, summary_data$mean_response, 
                    xlab = plot_config$x_lab, 
                    ylab = plot_config$y_lab, 
                    main = trimws(main_title),
-                   pch = 21,                       # Filled circles with border
-                   bg = plot_config$point_color,    # Fill color
-                   col = "black",                  # Border color
+                   pch = 21,
+                   bg = plot_config$point_color,
+                   col = "black",
                    cex = plot_config$point_size,
                    ylim = y_limits, 
                    xaxt = "n",
                    cex.lab = plot_config$axis_label_cex,
                    cex.axis = plot_config$axis_number_cex,
                    cex.main = plot_config$axis_label_cex * 1.1,
-                   font.main = 2,                  # Bold title
-                   panel.first = {
-                     if (show_grid) {
-                       # Professional grid
-                       graphics::grid(col = "grey90", lty = "solid", lwd = 0.7)
-                     }
+                   font.main = 2,
+                   panel.first = if (show_grid) {
+                     graphics::grid(col = "grey90", lty = "solid", lwd = 0.7)
                    },
-                   bty = "l",                      # L-shaped box
-                   tcl = -0.3)                     # Tick length
+                   bty = "l",
+                   tcl = -0.3)
     
-    # Professional x-axis formatting
+    # Custom x-axis with proper formatting
     x_ticks <- pretty(summary_data$log_inhibitor)
     graphics::axis(1, at = x_ticks, 
                    labels = format(x_ticks, digits = 2, nsmall = 1),
                    cex.axis = plot_config$axis_number_cex)
   }
   
-  # CORRECAO: Funcao add_error_bars atualizada para evitar o erro
+  # Add error bars (SD) for points with valid standard deviation
   add_error_bars <- function() {
-    # Filtra pontos com SD valido, positivo e significativo
     valid_mask <- !is.na(summary_data$sd_response) & 
       is.finite(summary_data$sd_response) & 
       summary_data$n_replicates > 1 &
-      summary_data$sd_response > 1e-10  # ? CORRECAO: exclui SD zero ou muito pequeno
+      summary_data$sd_response > 1e-10
     
     if (any(valid_mask)) {
       valid_data <- summary_data[valid_mask, ]
-      
-      # Verificacao adicional para garantir que as setas tenham comprimento > 0
-      arrow_lengths <- 2 * valid_data$sd_response
-      non_zero_arrows <- arrow_lengths > 1e-10
-      
-      if (any(non_zero_arrows)) {
-        graphics::arrows(
-          x0 = valid_data$log_inhibitor[non_zero_arrows],
-          y0 = valid_data$mean_response[non_zero_arrows] - valid_data$sd_response[non_zero_arrows],
-          x1 = valid_data$log_inhibitor[non_zero_arrows],
-          y1 = valid_data$mean_response[non_zero_arrows] + valid_data$sd_response[non_zero_arrows],
-          angle = 90, 
-          code = 3, 
-          length = plot_config$error_bar_width, 
-          col = plot_config$point_color,
-          lwd = 1.2
-        )
-      }
+      graphics::arrows(
+        x0 = valid_data$log_inhibitor,
+        y0 = valid_data$mean_response - valid_data$sd_response,
+        x1 = valid_data$log_inhibitor,
+        y1 = valid_data$mean_response + valid_data$sd_response,
+        angle = 90, 
+        code = 3, 
+        length = plot_config$error_bar_width, 
+        col = plot_config$point_color,
+        lwd = 1.2
+      )
     }
   }
   
-  # Enhanced fitted curve generation
+  # Generate smooth fitted curve for plotting
   generate_fitted_curve <- function(model) {
     x_range <- range(summary_data$log_inhibitor, na.rm = TRUE)
     if (!all(is.finite(x_range))) return(NULL)
     
-    # Extend range slightly for smoother curve edges
+    # Extend range for smoother curve ends
     x_padding <- diff(x_range) * 0.08
     x_seq <- seq(x_range[1] - x_padding, x_range[2] + x_padding, length.out = 300)
     
@@ -373,6 +403,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     }
   }
   
+  # Add vertical line at IC50 position
   add_ic50_line <- function(model) {
     if (!show_ic50_line) return(NULL)
     
@@ -387,21 +418,48 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     return(log_ic50)
   }
   
+  # Create legend content with model parameters - ATUALIZADA
   create_legend_content <- function(model = NULL) {
     if (!show_legend) return(NULL)
     
     if (!is.null(model) && isTRUE(result$success)) {
+      # Extrai parâmetros do modelo
       log_ic50 <- tryCatch(stats::coef(model)["LogIC50"], error = function(e) NA)
       ic50_value <- if (is.finite(log_ic50)) 10^log_ic50 else NA
       r_squared <- round(result$goodness_of_fit$R_squared, 3)
       
-      c(
-        if (is.finite(log_ic50)) paste("LogIC50 =", round(log_ic50, 3)) else "LogIC50 = NA",
-        if (is.finite(ic50_value)) paste("IC50 =", sprintf("%.2e", ic50_value)) else "IC50 = NA",
-        paste("R2 =", r_squared)
-      )
+      # Verifica se o IC50 foi excluído devido ao threshold
+      ic50_excluded <- FALSE
+      if (enforce_bottom_threshold && !is.na(result$parameters$Value[1])) {
+        bottom_value <- result$parameters$Value[1]  # Bottom parameter
+        ic50_excluded <- bottom_value >= bottom_threshold
+      }
+      
+      legend_text <- c()
+      
+      if (ic50_excluded) {
+        legend_text <- c(legend_text, "LogIC50 = NA")
+      } else if (is.finite(log_ic50)) {
+        legend_text <- c(legend_text, paste("LogIC50 =", round(log_ic50, 3)))
+      } else {
+        legend_text <- c(legend_text, "LogIC50 = NA")
+      }
+      
+      if (ic50_excluded) {
+        legend_text <- c(legend_text, "IC50 = NA")
+      } else if (is.finite(ic50_value)) {
+        legend_text <- c(legend_text, paste("IC50 =", sprintf("%.2e", ic50_value)))
+      } else {
+        legend_text <- c(legend_text, "IC50 = NA")
+      }
+      
+      # R² sempre mostra
+      legend_text <- c(legend_text, paste("R² =", r_squared))
+      
+      return(legend_text)
+      
     } else {
-      "Model did not converge"
+      return("Model did not converge")
     }
   }
   
@@ -414,18 +472,16 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     }
   }
   
-  # Main plotting execution
+  # Main plotting logic
   model_success <- !is.null(result$model) && isTRUE(result$success)
   
   if (model_success) {
-    # Successful model fit
     create_base_plot()
     add_error_bars()
     add_fitted_curve(result$model)
     add_ic50_line(result$model)
     legend_content <- create_legend_content(result$model)
   } else {
-    # Model failed
     create_base_plot("(Model failed)")
     add_error_bars()
     legend_content <- create_legend_content()
@@ -433,7 +489,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
   
   add_legend(legend_content)
   
-  # Enhanced return of rich metadata
+  # Return comprehensive metadata
   invisible(list(
     compound_name = compound_name_display,
     compound_index = compound_index,
@@ -443,7 +499,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     y_limits_used = y_limits,
     data_points = nrow(clean_data),
     concentration_levels = nrow(summary_data),
-    file_saved = if (!is.null(plot_device)) filename else NULL,
+    file_saved = if (!is.null(plot_device_info)) plot_device_info$filename else NULL,
     plot_dimensions = c(width = plot_width, height = plot_height, dpi = plot_dpi),
     timestamp = Sys.time()
   ))
