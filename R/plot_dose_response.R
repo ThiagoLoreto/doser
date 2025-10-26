@@ -152,7 +152,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
                                x_axis_title = NULL, y_axis_title = NULL,
                                enforce_bottom_threshold = NULL, bottom_threshold = 60) {
   
-  # Input validation function
+  # Input validation
   validate_inputs <- function(results, compound_index) {
     if (missing(results)) {
       stop("Argument 'results' is required")
@@ -375,14 +375,13 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     }
   }
   
-  # Generate smooth fitted curve for plotting
+  # Generate smooth fitted curve for plotting - NO EXTRAPOLATION
   generate_fitted_curve <- function(model) {
     x_range <- range(summary_data$log_inhibitor, na.rm = TRUE)
     if (!all(is.finite(x_range))) return(NULL)
     
-    # Extend range for smoother curve ends
-    x_padding <- diff(x_range) * 0.08
-    x_seq <- seq(x_range[1] - x_padding, x_range[2] + x_padding, length.out = 300)
+    # Create sequence ONLY within observed data range
+    x_seq <- seq(x_range[1], x_range[2], length.out = 300)
     
     predictions <- tryCatch({
       predict(model, newdata = data.frame(log_inhibitor = x_seq))
@@ -418,17 +417,17 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     return(log_ic50)
   }
   
-  # Create legend content with model parameters - ATUALIZADA
+  # Create legend content with model parameters
   create_legend_content <- function(model = NULL) {
     if (!show_legend) return(NULL)
     
     if (!is.null(model) && isTRUE(result$success)) {
-      # Extrai parâmetros do modelo
+      # Extract model parameters
       log_ic50 <- tryCatch(stats::coef(model)["LogIC50"], error = function(e) NA)
       ic50_value <- if (is.finite(log_ic50)) 10^log_ic50 else NA
       r_squared <- round(result$goodness_of_fit$R_squared, 3)
       
-      # Verifica se o IC50 foi excluído devido ao threshold
+      # Check if IC50 was excluded due to threshold
       ic50_excluded <- FALSE
       if (enforce_bottom_threshold && !is.na(result$parameters$Value[1])) {
         bottom_value <- result$parameters$Value[1]  # Bottom parameter
@@ -453,7 +452,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
         legend_text <- c(legend_text, "IC50 = NA")
       }
       
-      # R² sempre mostra
+      # Always show R²
       legend_text <- c(legend_text, paste("R² =", r_squared))
       
       return(legend_text)
