@@ -618,7 +618,7 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = F
       apply_threshold <- FALSE
       if (enforce_bottom_threshold && !is.na(params[1]) && params[1] >= bottom_threshold) {
         curve_type <- result$curve_type %||% detect_curve_type(result$data)
-        if (curve_type == "inhibition") {
+        if (curve_type %in% c("inhibition", "flat")) {
           apply_threshold <- TRUE
         }
       }
