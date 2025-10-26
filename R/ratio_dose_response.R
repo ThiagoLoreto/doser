@@ -134,8 +134,8 @@ ratio_dose_response <- function(data,
   colnames(data) <- as.character(data[9, ])
   
   # Separate the two subtables
-  subtable1 <- data[10:25, ]  # First A-P
-  subtable2 <- data[28:43, ]  # Second A-P
+  subtable1 <- data[10:25,1:25 ]  # First A-P
+  subtable2 <- data[28:43,1:25 ]  # Second A-P
   
   # Save rownames
   final_rownames <- subtable1[, 1]
