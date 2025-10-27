@@ -13,7 +13,7 @@
 #'   If TRUE, responses are normalized from 0-100% based on the first and last values.
 #'   Default is FALSE.
 #' @param verbose Logical indicating whether to display progress messages and
-#'   summary statistics. Default is FALSE.
+#'   summary statistics. Default is TRUE
 #' @param enforce_bottom_threshold Logical indicating whether to exclude IC50 values
 #'   for curves where the Bottom parameter exceeds a threshold. Default is FALSE.
 #' @param bottom_threshold Numeric value specifying the Bottom threshold when
@@ -129,7 +129,7 @@
 #' @importFrom dplyr %>% mutate across
 #' @export
 
-fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = FALSE, 
+fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = TRUE, 
                         enforce_bottom_threshold = FALSE, bottom_threshold = 60, 
                         r_sqr_threshold = 0.5) {
   

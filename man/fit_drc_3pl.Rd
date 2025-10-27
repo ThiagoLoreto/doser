@@ -8,7 +8,7 @@ fit_drc_3pl(
   data,
   output_file = NULL,
   normalize = FALSE,
-  verbose = FALSE,
+  verbose = TRUE,
   enforce_bottom_threshold = FALSE,
   bottom_threshold = 60,
   r_sqr_threshold = 0.5
@@ -27,7 +27,7 @@ If TRUE, responses are normalized from 0-100\% based on the first and last value
 Default is FALSE.}
 
 \item{verbose}{Logical indicating whether to display progress messages and
-summary statistics. Default is FALSE.}
+summary statistics. Default is TRUE}
 
 \item{enforce_bottom_threshold}{Logical indicating whether to exclude IC50 values
 for curves where the Bottom parameter exceeds a threshold. Default is FALSE.}

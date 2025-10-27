@@ -10,7 +10,8 @@ ratio_dose_response(
   control_100perc = NULL,
   split_replicates = TRUE,
   info_table = NULL,
-  save_to_excel = NULL
+  save_to_excel = NULL,
+  verbose = TRUE
 )
 }
 \arguments{
@@ -32,6 +33,8 @@ log(inhibitor), Plate_Row, Target, and Compound information.}
 
 \item{save_to_excel}{Character string specifying Excel file path for saving processed results
 (default: NULL, no saving).}
+
+\item{verbose}{Logical indicating whether to display progress messages}
 }
 \value{
 A list containing the following components:

@@ -18,6 +18,7 @@
 #'   log(inhibitor), Plate_Row, Target, and Compound information.
 #' @param save_to_excel Character string specifying Excel file path for saving processed results
 #'   (default: NULL, no saving).
+#' @param verbose Logical indicating whether to display progress messages
 #'
 #' @return A list containing the following components:
 #' \itemize{
@@ -123,7 +124,7 @@
 ratio_dose_response <- function(data, 
                                 control_0perc = NULL, control_100perc = NULL,
                                 split_replicates = TRUE, info_table = NULL,
-                                save_to_excel = NULL) {
+                                save_to_excel = NULL, verbose = TRUE) {
   
   # Input validation
   if (nrow(data) < 43) {
@@ -134,8 +135,8 @@ ratio_dose_response <- function(data,
   colnames(data) <- as.character(data[9, ])
   
   # Separate the two subtables
-  subtable1 <- data[10:25,1:25 ]  # First A-P
-  subtable2 <- data[28:43,1:25 ]  # Second A-P
+  subtable1 <- data[10:25, 1:25]  # First A-P
+  subtable2 <- data[28:43, 1:25]  # Second A-P
   
   # Save rownames
   final_rownames <- subtable1[, 1]
@@ -192,6 +193,7 @@ ratio_dose_response <- function(data,
   # Initialize result
   result <- list()
   
+  # PREPARE INFO_TABLE WITH DISTINCT IDs FOR BIOLOGICAL REPLICATES
   if (!is.null(info_table)) {
     if (ncol(info_table) < 4) {
       stop("Info table must have at least 4 columns: log(inhibitor), Plate_Row, Target, and Compound")
@@ -201,18 +203,20 @@ ratio_dose_response <- function(data,
     base_id_values <- paste(info_table[[3]], info_table[[4]], sep = "-")
     info_table$Base_ID <- base_id_values
     
+    # ALWAYS DISTINGUISH BIOLOGICAL REPLICAS (default behavior)
     # Count occurrences of each Base_ID
     id_counts <- table(base_id_values)
     duplicate_ids <- names(id_counts)[id_counts > 1]
     
-    # Add suffixes to Target ONLY for duplicates
+    # Add suffixes to Target ONLY for duplicates (optimization)
     if (length(duplicate_ids) > 0) {
       suffix_counter <- setNames(rep(1, length(duplicate_ids)), duplicate_ids)
-      new_target_values <- info_table[[3]]
+      new_target_values <- info_table[[3]]  # Start with original targets
       
       for (i in seq_along(base_id_values)) {
         current_base_id <- base_id_values[i]
         if (current_base_id %in% duplicate_ids) {
+          # Add suffix only if not the first occurrence
           if (suffix_counter[current_base_id] > 1) {
             new_target_values[i] <- paste0(info_table[[3]][i], "_", suffix_counter[current_base_id])
           }
@@ -220,31 +224,34 @@ ratio_dose_response <- function(data,
         }
       }
       
+      # Update Target column in info_table
       info_table$Target_Modified <- new_target_values
       
       # Show message about duplicates found
-      message("Found and automatically distinguished ", length(duplicate_ids), 
-              " biological replicate(s): ", paste(duplicate_ids, collapse = ", "))
+      if (verbose) {
+        message("Found and automatically distinguished ", length(duplicate_ids), 
+                " biological replicate(s): ", paste(duplicate_ids, collapse = ", "))
+      }
     } else {
+      # If no replicates, use original target (no unnecessary suffixes)
       info_table$Target_Modified <- info_table[[3]]
     }
     
-    # Creat final IF with Target
+    # Create final ID with Target (modified if necessary)
     info_table$ID <- paste(info_table$Target_Modified, info_table[[4]], sep = "-")
-    
   }
   
   # AUTOMATICALLY CREATE ROW INTERVALS BASED ON TARGET COLUMN
   if (!is.null(info_table) && !is.null(control_0perc) && !is.null(control_100perc)) {
     
-    # Extract Plate_Row and Target columns 
+    # Extract Plate_Row and Target columns - USE MODIFIED TARGET for grouping
     plate_row_values <- info_table[[2]]
-    target_values <- info_table$Target_Modified 
+    target_values <- info_table$Target_Modified
     
     # Create mapping from Plate_Row to row index
     plate_row_to_index <- setNames(seq_along(plate_row_values), plate_row_values)
     
-    # Group rows by Target
+    # Group rows by Target (now with distinct targets if replicates exist)
     target_groups <- split(plate_row_values, target_values)
     row_intervals <- lapply(target_groups, function(plate_rows) {
       indices <- plate_row_to_index[plate_rows]
@@ -380,11 +387,11 @@ ratio_dose_response <- function(data,
             # Calculate the lowest comment
             lowest_comment <- get_lowest_comment(luciferase_comment, assay_window_comment, z_score_comment)
             
-            # CORREÇÃO: Calcular as médias dos controles
+            # Calculate control means
             mean_background <- if (length(existing_columns) >= 1) mean(ratio[valid_rows, control_0perc], na.rm = TRUE) else NA
             mean_positive <- if (length(existing_columns) >= 2) mean(ratio[valid_rows, control_100perc], na.rm = TRUE) else NA
             
-            # CORREÇÃO: Substituir valores na ratio_modified com as médias
+            # Replace values in ratio_modified with means
             if (length(existing_columns) >= 1) {
               ratio_modified[valid_rows, control_0perc] <<- mean_background
             }
@@ -392,7 +399,7 @@ ratio_dose_response <- function(data,
               ratio_modified[valid_rows, control_100perc] <<- mean_positive
             }
             
-            # Create one line per Target
+            # Create ONE ROW per target with both controls
             interval_means_list[[target_name]] <- data.frame(
               Type = "Target_Interval",
               Target = target_name,
@@ -433,11 +440,15 @@ ratio_dose_response <- function(data,
           "Rows", "Rows_Count"
         )]
         
-        # Transform Target in row.names and remove Type and Target
+        # Transform Target into row.names and remove Type and Target columns
         if (nrow(result$interval_means) > 0) {
+          # Create clean table without Type and Target columns
           interval_means_clean <- result$interval_means[, -c(1, 2)]
+          
+          # Set row names as Target values
           rownames(interval_means_clean) <- result$interval_means$Target
           
+          # Replace original table with clean version
           result$interval_means <- as.data.frame(t(interval_means_clean))
         }
         
@@ -464,9 +475,9 @@ ratio_dose_response <- function(data,
   ratio_modified_transposed <- as.data.frame(t(ratio_modified))
   colnames(ratio_modified_transposed) <- rownames(ratio_modified)
   
-  # REPLACE COLUMN NAMES WITH IDs FROM INFO TABLE (USANDO OS IDs COMPLETOS)
+  # REPLACE COLUMN NAMES WITH IDs FROM INFO TABLE (USING COMPLETE IDs)
   if (!is.null(info_table)) {
-    # Create mapping and replace column names - USA OS IDs COMPLETOS
+    # Create mapping and replace column names - USE COMPLETE IDs
     mapping <- setNames(info_table$ID, info_table[[2]])
     new_colnames <- mapping[colnames(ratio_modified_transposed)]
     
@@ -532,10 +543,24 @@ ratio_dose_response <- function(data,
     log_col <- info_table[[1]]
     n_needed <- nrow(final_table)
     
-    adjusted_log_col <- if (length(log_col) >= n_needed) {
-      log_col[1:n_needed]
+    # CHECK AND CORRECT FIRST ROW
+    if (length(log_col) > 0 && !is.na(log_col[1])) {
+      warning("First row of log(inhibitor) is not NA. Shifting values and setting first row to NA.")
+      
+      # Shift values down and add NA at the beginning
+      adjusted_log_col <- c(NA, log_col[1:min(length(log_col), n_needed - 1)])
+      
+      # Fill with NA if necessary
+      if (length(adjusted_log_col) < n_needed) {
+        adjusted_log_col <- c(adjusted_log_col, rep(NA, n_needed - length(adjusted_log_col)))
+      }
     } else {
-      c(log_col, rep(NA, n_needed - length(log_col)))
+      # Original behavior if first row is already NA
+      adjusted_log_col <- if (length(log_col) >= n_needed) {
+        log_col[1:n_needed]
+      } else {
+        c(log_col, rep(NA, n_needed - length(log_col)))
+      }
     }
     
     final_table <- cbind(adjusted_log_col, final_table)
@@ -579,7 +604,7 @@ ratio_dose_response <- function(data,
       
       # Save workbook
       openxlsx::saveWorkbook(wb, save_to_excel, overwrite = TRUE)
-      message("Excel file saved successfully: ", save_to_excel)
+      if (verbose) message("Excel file saved successfully: ", save_to_excel)
       
     }, error = function(e) {
       warning("Failed to save Excel file: ", e$message)
