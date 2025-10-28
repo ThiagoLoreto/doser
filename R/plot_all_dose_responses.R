@@ -127,14 +127,6 @@
 #' \code{\link{fit_dose_response}} for generating analysis results
 #'
 #' @export
-#'
-#' @references
-#' For scientific visualization best practices:
-#' \itemize{
-#'   \item "Fundamentals of Data Visualization" (Claus O. Wilke)
-#'   \item Nature Research Figure Preparation Guidelines
-#'   \item Journal of Pharmacology and Experimental Therapeutics Figure Standards
-#' }
 
 
 plot_all_dose_responses <- function(results, 

@@ -68,11 +68,10 @@ dose-response analysis results.}
 
 \item{axis_number_cex}{Character expansion factor for axis numbers (default: 1.4).}
 
-\item{x_axis_title}{Custom x-axis title. If NULL, uses default expression
-(default: NULL).}
+\item{x_axis_title}{Custom x-axis title. If NULL, uses default expression .}
 
 \item{y_axis_title}{Custom y-axis title. If NULL, uses default based on
-normalization status (default: NULL).}
+normalization status}
 }
 \value{
 Invisibly returns a list containing plot metadata:

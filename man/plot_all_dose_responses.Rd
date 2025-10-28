@@ -149,14 +149,6 @@ plot_all_dose_responses(
 }
 
 }
-\references{
-For scientific visualization best practices:
-\itemize{
-\item "Fundamentals of Data Visualization" (Claus O. Wilke)
-\item Nature Research Figure Preparation Guidelines
-\item Journal of Pharmacology and Experimental Therapeutics Figure Standards
-}
-}
 \seealso{
 \code{\link{plot_dose_response}} for individual plot customization
 \code{\link{plot_multiple_compounds}} for multi-curve comparison plots

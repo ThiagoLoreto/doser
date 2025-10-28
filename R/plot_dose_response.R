@@ -22,10 +22,9 @@
 #' @param plot_dpi Resolution for saved raster images (default: 600).
 #' @param axis_label_cex Character expansion factor for axis labels (default: 1.4).
 #' @param axis_number_cex Character expansion factor for axis numbers (default: 1.4).
-#' @param x_axis_title Custom x-axis title. If NULL, uses default expression 
-#'   (default: NULL).
+#' @param x_axis_title Custom x-axis title. If NULL, uses default expression .
 #' @param y_axis_title Custom y-axis title. If NULL, uses default based on 
-#'   normalization status (default: NULL).
+#'   normalization status
 #'
 #' @return Invisibly returns a list containing plot metadata:
 #' \itemize{

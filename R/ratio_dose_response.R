@@ -126,22 +126,17 @@ ratio_dose_response <- function(data,
                                 split_replicates = TRUE, info_table = NULL,
                                 save_to_excel = NULL, verbose = TRUE) {
   
-  # Input validation
   if (nrow(data) < 43) {
     stop("Data must have at least 43 rows")
   }
   
-  # Set column names using row 9
   colnames(data) <- as.character(data[9, ])
   
-  # Separate the two subtables
-  subtable1 <- data[10:25, 1:25]  # First A-P
-  subtable2 <- data[28:43, 1:25]  # Second A-P
+  subtable1 <- data[10:25, 1:25]
+  subtable2 <- data[28:43, 1:25]
   
-  # Save rownames
   final_rownames <- subtable1[, 1]
   
-  # Convert to numeric
   convert_to_numeric_df <- function(df, rownames_vec) {
     num_df <- as.data.frame(apply(df[, -1], 2, as.numeric))
     rownames(num_df) <- rownames_vec
@@ -151,7 +146,6 @@ ratio_dose_response <- function(data,
   subtable1_num <- convert_to_numeric_df(subtable1, final_rownames)
   subtable2_num <- convert_to_numeric_df(subtable2, final_rownames)
   
-  # Replace values < 1000 with NA in subtable1 (excluding controls)
   replace_low_values <- function(df, controls) {
     all_cols <- colnames(df)
     non_control_cols <- if (!is.null(controls)) {
@@ -179,7 +173,6 @@ ratio_dose_response <- function(data,
   
   subtable1_num <- replace_low_values(subtable1_num, controls_vec)
   
-  # Calculate ratio with safety check for division by zero
   if (any(subtable1_num == 0, na.rm = TRUE)) {
     warning("Division by zero detected in ratio calculation - replacing with NA")
     subtable1_num[subtable1_num == 0] <- NA
@@ -187,36 +180,29 @@ ratio_dose_response <- function(data,
   
   ratio <- (subtable2_num / subtable1_num) * 1000
   
-  # Create a copy for modifications
   ratio_modified <- ratio
   
-  # Initialize result
   result <- list()
   
-  # PREPARE INFO_TABLE WITH DISTINCT IDs FOR BIOLOGICAL REPLICATES
+  # Prepare info_table with distinct IDs for biological replicates
   if (!is.null(info_table)) {
     if (ncol(info_table) < 4) {
       stop("Info table must have at least 4 columns: log(inhibitor), Plate_Row, Target, and Compound")
     }
     
-    # Create base ID column by combining Target and Compound
     base_id_values <- paste(info_table[[3]], info_table[[4]], sep = "-")
     info_table$Base_ID <- base_id_values
     
-    # ALWAYS DISTINGUISH BIOLOGICAL REPLICAS (default behavior)
-    # Count occurrences of each Base_ID
     id_counts <- table(base_id_values)
     duplicate_ids <- names(id_counts)[id_counts > 1]
     
-    # Add suffixes to Target ONLY for duplicates (optimization)
     if (length(duplicate_ids) > 0) {
       suffix_counter <- setNames(rep(1, length(duplicate_ids)), duplicate_ids)
-      new_target_values <- info_table[[3]]  # Start with original targets
+      new_target_values <- info_table[[3]]
       
       for (i in seq_along(base_id_values)) {
         current_base_id <- base_id_values[i]
         if (current_base_id %in% duplicate_ids) {
-          # Add suffix only if not the first occurrence
           if (suffix_counter[current_base_id] > 1) {
             new_target_values[i] <- paste0(info_table[[3]][i], "_", suffix_counter[current_base_id])
           }
@@ -224,49 +210,47 @@ ratio_dose_response <- function(data,
         }
       }
       
-      # Update Target column in info_table
       info_table$Target_Modified <- new_target_values
       
-      # Show message about duplicates found
       if (verbose) {
         message("Found and automatically distinguished ", length(duplicate_ids), 
                 " biological replicate(s): ", paste(duplicate_ids, collapse = ", "))
       }
     } else {
-      # If no replicates, use original target (no unnecessary suffixes)
       info_table$Target_Modified <- info_table[[3]]
     }
     
-    # Create final ID with Target (modified if necessary)
     info_table$ID <- paste(info_table$Target_Modified, info_table[[4]], sep = "-")
   }
   
-  # AUTOMATICALLY CREATE ROW INTERVALS BASED ON TARGET COLUMN
+  # Automatically create row intervals based on Target column
   if (!is.null(info_table) && !is.null(control_0perc) && !is.null(control_100perc)) {
     
-    # Extract Plate_Row and Target columns - USE MODIFIED TARGET for grouping
     plate_row_values <- info_table[[2]]
     target_values <- info_table$Target_Modified
     
-    # Create mapping from Plate_Row to row index
     plate_row_to_index <- setNames(seq_along(plate_row_values), plate_row_values)
     
-    # Group rows by Target (now with distinct targets if replicates exist)
-    target_groups <- split(plate_row_values, target_values)
+    # Preserve original order from info_table
+    target_groups <- list()
+    unique_targets <- unique(target_values)
+    
+    for (target in unique_targets) {
+      target_indices <- which(target_values == target)
+      target_groups[[target]] <- plate_row_values[target_indices]
+    }
+    
     row_intervals <- lapply(target_groups, function(plate_rows) {
       indices <- plate_row_to_index[plate_rows]
       as.numeric(indices[!is.na(indices)])
     })
     
-    # Remove empty groups
     row_intervals <- row_intervals[sapply(row_intervals, length) > 0]
     
-    # Use control columns for mean calculation
     mean_columns <- c(control_0perc, control_100perc)
     existing_columns <- mean_columns[mean_columns %in% colnames(ratio)]
     
     if (length(existing_columns) > 0 && length(row_intervals) > 0) {
-      # Calculate general means
       general_means <- colMeans(ratio[, existing_columns, drop = FALSE], na.rm = TRUE)
       
       result$general_means <- data.frame(
@@ -277,147 +261,129 @@ ratio_dose_response <- function(data,
         stringsAsFactors = FALSE
       )
       
-      # Function to get the "lowest" comment
       get_lowest_comment <- function(luciferase_comment, assay_window_comment, z_score_comment) {
-        # Define priority order (from lowest to highest)
         priority_order <- c("insufficient", "low", "medium", "high")
         
-        # Extract the first word from each comment (the quality level)
         luciferase_level <- strsplit(luciferase_comment, " ")[[1]][1]
         assay_level <- strsplit(assay_window_comment, " ")[[1]][1]
         z_level <- strsplit(z_score_comment, " ")[[1]][1]
         
-        # Convert to priority scores
         luciferase_score <- match(luciferase_level, priority_order)
         assay_score <- match(assay_level, priority_order)
         z_score <- match(z_level, priority_order)
         
-        # Find the minimum score (lowest quality)
         min_score <- min(luciferase_score, assay_score, z_score, na.rm = TRUE)
         
-        # Return the corresponding comment
         return(priority_order[min_score])
       }
       
-      # Calculate means by target intervals WITH ADDITIONAL METRICS
       calculate_target_means <- function() {
         interval_means_list <- list()
         
-        for (target_name in names(row_intervals)) {
-          interval_rows <- row_intervals[[target_name]]
-          valid_rows <- interval_rows[interval_rows >= 1 & interval_rows <= nrow(ratio)]
-          
-          if (length(valid_rows) > 0) {
-            # Calculate mean of ALL values in subtable1 for this interval
-            subtable1_interval_data <- as.matrix(subtable1_num[valid_rows, ])
-            mean_subtable1_all <- mean(subtable1_interval_data, na.rm = TRUE)
+        # Use same order as in info_table
+        for (target_name in unique_targets) {
+          if (target_name %in% names(row_intervals)) {
+            interval_rows <- row_intervals[[target_name]]
+            valid_rows <- interval_rows[interval_rows >= 1 & interval_rows <= nrow(ratio)]
             
-            # Calculate luciferase signal comment
-            luciferase_comment <- if (is.na(mean_subtable1_all)) {
-              "insufficient luciferase signal"
-            } else if (mean_subtable1_all > 100000) {
-              "high (>100000)"
-            } else if (mean_subtable1_all > 10000) {
-              "medium (10000<x<100000)"
-            } else if (mean_subtable1_all > 1000) {
-              "low (1000<x<10000)"
-            } else {
-              "insufficient luciferase signal"
-            }
-            
-            # Initialize Z-score and Assay Window variables
-            z_score <- NA
-            assay_window <- NA
-            assay_window_comment <- NA
-            z_score_comment <- NA
-            
-            # Calculate Z-score and Assay Window for each target interval
-            if (length(existing_columns) == 2) {
-              # Get control data for this target interval
-              control_0_data <- ratio[valid_rows, control_0perc]
-              control_100_data <- ratio[valid_rows, control_100perc]
+            if (length(valid_rows) > 0) {
+              subtable1_interval_data <- as.matrix(subtable1_num[valid_rows, ])
+              mean_subtable1_all <- mean(subtable1_interval_data, na.rm = TRUE)
               
-              # Calculate means and SDs
-              mean_0 <- mean(control_0_data, na.rm = TRUE)
-              mean_100 <- mean(control_100_data, na.rm = TRUE)
-              sd_0 <- sd(control_0_data, na.rm = TRUE)
-              sd_100 <- sd(control_100_data, na.rm = TRUE)
-              
-              # Calculate Z-score
-              z_score <- if (!is.na(mean_100) && !is.na(mean_0) && (mean_100 - mean_0) != 0) {
-                1 - (3 * (sd_100 + sd_0) / (mean_100 - mean_0))
+              luciferase_comment <- if (is.na(mean_subtable1_all)) {
+                "insufficient luciferase signal"
+              } else if (mean_subtable1_all > 100000) {
+                "high (>100000)"
+              } else if (mean_subtable1_all > 10000) {
+                "medium (10000<x<100000)"
+              } else if (mean_subtable1_all > 1000) {
+                "low (1000<x<10000)"
               } else {
-                NA
+                "insufficient luciferase signal"
               }
               
-              # Calculate Assay Window
-              assay_window <- if (!is.na(mean_100) && !is.na(mean_0) && mean_0 != 0) {
-                mean_100 / mean_0
-              } else {
-                NA
+              z_score <- NA
+              assay_window <- NA
+              assay_window_comment <- NA
+              z_score_comment <- NA
+              
+              if (length(existing_columns) == 2) {
+                control_0_data <- ratio[valid_rows, control_0perc]
+                control_100_data <- ratio[valid_rows, control_100perc]
+                
+                mean_0 <- mean(control_0_data, na.rm = TRUE)
+                mean_100 <- mean(control_100_data, na.rm = TRUE)
+                sd_0 <- sd(control_0_data, na.rm = TRUE)
+                sd_100 <- sd(control_100_data, na.rm = TRUE)
+                
+                z_score <- if (!is.na(mean_100) && !is.na(mean_0) && (mean_100 - mean_0) != 0) {
+                  1 - (3 * (sd_100 + sd_0) / (mean_100 - mean_0))
+                } else {
+                  NA
+                }
+                
+                assay_window <- if (!is.na(mean_100) && !is.na(mean_0) && mean_0 != 0) {
+                  mean_100 / mean_0
+                } else {
+                  NA
+                }
+                
+                assay_window_comment <- if (is.na(assay_window)) {
+                  "insufficient"
+                } else if (assay_window > 3) {
+                  "high (>3)"
+                } else if (assay_window > 2) {
+                  "medium (2<x<3)"
+                } else if (assay_window > 1.5) {
+                  "low (<2)"
+                } else {
+                  "insufficient"
+                }
+                
+                z_score_comment <- if (is.na(z_score)) {
+                  "insufficient"
+                } else if (z_score > 0.7) {
+                  "high (>0.7)"
+                } else if (z_score > 0.5) {
+                  "medium (0.5<x<0.7)"
+                } else if (z_score > 0.25) {
+                  "low (<0.5)"
+                } else {
+                  "insufficient"
+                }
               }
               
-              # Calculate Assay Window comment
-              assay_window_comment <- if (is.na(assay_window)) {
-                "insufficient"
-              } else if (assay_window > 3) {
-                "high (>3)"
-              } else if (assay_window > 2) {
-                "medium (2<x<3)"
-              } else if (assay_window > 1.5) {
-                "low (<2)"
-              } else {
-                "insufficient"
+              lowest_comment <- get_lowest_comment(luciferase_comment, assay_window_comment, z_score_comment)
+              
+              mean_background <- if (length(existing_columns) >= 1) mean(ratio[valid_rows, control_0perc], na.rm = TRUE) else NA
+              mean_positive <- if (length(existing_columns) >= 2) mean(ratio[valid_rows, control_100perc], na.rm = TRUE) else NA
+              
+              if (length(existing_columns) >= 1) {
+                ratio_modified[valid_rows, control_0perc] <<- mean_background
+              }
+              if (length(existing_columns) >= 2) {
+                ratio_modified[valid_rows, control_100perc] <<- mean_positive
               }
               
-              # Calculate Z-score comment
-              z_score_comment <- if (is.na(z_score)) {
-                "insufficient"
-              } else if (z_score > 0.7) {
-                "high (>0.7)"
-              } else if (z_score > 0.5) {
-                "medium (0.5<x<0.7)"
-              } else if (z_score > 0.25) {
-                "low (<0.5)"
-              } else {
-                "insufficient"
-              }
+              interval_means_list[[target_name]] <- data.frame(
+                Type = "Target_Interval",
+                Target = target_name,
+                Average_Background = mean_background,
+                SD_Background = if (length(existing_columns) >= 1) sd(ratio[valid_rows, control_0perc], na.rm = TRUE) else NA,
+                Average_Positive_Ctrl = mean_positive,
+                SD_Positive_Ctrl = if (length(existing_columns) >= 2) sd(ratio[valid_rows, control_100perc], na.rm = TRUE) else NA,
+                Average_luciferase_signal = mean_subtable1_all,
+                Luciferase_signal_comment = luciferase_comment,
+                Z_Score = z_score,
+                Assay_z_Comment = z_score_comment,
+                Assay_Window = assay_window,
+                Assay_window_Comment = assay_window_comment,
+                Overall_Quality = lowest_comment,
+                Rows = paste0(target_name, " (rows ", paste(range(valid_rows), collapse = "-"), ")"),
+                Rows_Count = length(valid_rows),
+                stringsAsFactors = FALSE
+              )
             }
-            
-            # Calculate the lowest comment
-            lowest_comment <- get_lowest_comment(luciferase_comment, assay_window_comment, z_score_comment)
-            
-            # Calculate control means
-            mean_background <- if (length(existing_columns) >= 1) mean(ratio[valid_rows, control_0perc], na.rm = TRUE) else NA
-            mean_positive <- if (length(existing_columns) >= 2) mean(ratio[valid_rows, control_100perc], na.rm = TRUE) else NA
-            
-            # Replace values in ratio_modified with means
-            if (length(existing_columns) >= 1) {
-              ratio_modified[valid_rows, control_0perc] <<- mean_background
-            }
-            if (length(existing_columns) >= 2) {
-              ratio_modified[valid_rows, control_100perc] <<- mean_positive
-            }
-            
-            # Create ONE ROW per target with both controls
-            interval_means_list[[target_name]] <- data.frame(
-              Type = "Target_Interval",
-              Target = target_name,
-              Average_Background = mean_background,
-              SD_Background = if (length(existing_columns) >= 1) sd(ratio[valid_rows, control_0perc], na.rm = TRUE) else NA,
-              Average_Positive_Ctrl = mean_positive,
-              SD_Positive_Ctrl = if (length(existing_columns) >= 2) sd(ratio[valid_rows, control_100perc], na.rm = TRUE) else NA,
-              Average_luciferase_signal = mean_subtable1_all,
-              Luciferase_signal_comment = luciferase_comment,
-              Z_Score = z_score,
-              Assay_z_Comment = z_score_comment,
-              Assay_Window = assay_window,
-              Assay_window_Comment = assay_window_comment,
-              Overall_Quality = lowest_comment,
-              Rows = paste0(target_name, " (rows ", paste(range(valid_rows), collapse = "-"), ")"),
-              Rows_Count = length(valid_rows),
-              stringsAsFactors = FALSE
-            )
           }
         }
         return(interval_means_list)
@@ -429,7 +395,6 @@ ratio_dose_response <- function(data,
         result$interval_means <- do.call(rbind, interval_means_list)
         rownames(result$interval_means) <- NULL
         
-        # Reorder columns for better readability
         result$interval_means <- result$interval_means[, c(
           "Type", "Target", 
           "Average_Positive_Ctrl", "SD_Positive_Ctrl",
@@ -440,16 +405,11 @@ ratio_dose_response <- function(data,
           "Rows", "Rows_Count"
         )]
         
-        # Transform Target into row.names and remove Type and Target columns
         if (nrow(result$interval_means) > 0) {
-          # Create clean table without Type and Target columns
           interval_means_clean <- result$interval_means[, -c(1, 2)]
-          
-          # Set row names as Target values
           rownames(interval_means_clean) <- result$interval_means$Target
-          
-          # Replace original table with clean version
-          result$interval_means <- as.data.frame(t(interval_means_clean))
+          interval_means_transposed <- as.data.frame(t(interval_means_clean))
+          result$interval_means <- interval_means_transposed
         }
         
         result$target_intervals <- row_intervals
@@ -457,11 +417,10 @@ ratio_dose_response <- function(data,
     }
   }
   
-  # REORGANIZE COLUMNS - place controls at beginning and end
+  # Reorganize columns - place controls at beginning and end
   if (!is.null(control_0perc) && !is.null(control_100perc)) {
     control_cols <- c(control_0perc, control_100perc)
     
-    # Verify control columns exist
     missing_controls <- control_cols[!control_cols %in% colnames(ratio_modified)]
     if (length(missing_controls) > 0) {
       stop("Control columns not found: ", paste(missing_controls, collapse = ", "))
@@ -471,13 +430,11 @@ ratio_dose_response <- function(data,
     ratio_modified <- ratio_modified[, c(control_0perc, other_columns, control_100perc)]
   }
   
-  # TRANSPOSE the modified table
   ratio_modified_transposed <- as.data.frame(t(ratio_modified))
   colnames(ratio_modified_transposed) <- rownames(ratio_modified)
   
-  # REPLACE COLUMN NAMES WITH IDs FROM INFO TABLE (USING COMPLETE IDs)
+  # Replace column names with IDs from info table
   if (!is.null(info_table)) {
-    # Create mapping and replace column names - USE COMPLETE IDs
     mapping <- setNames(info_table$ID, info_table[[2]])
     new_colnames <- mapping[colnames(ratio_modified_transposed)]
     
@@ -488,7 +445,7 @@ ratio_dose_response <- function(data,
     )
   }
   
-  # SPLIT REPLICATES if requested
+  # Split replicates if requested
   final_table <- if (split_replicates) {
     split_replicates_func <- function(df) {
       n_rows <- nrow(df)
@@ -507,13 +464,9 @@ ratio_dose_response <- function(data,
       new_table <- data.frame()
       
       for (col in colnames(df)) {
-        # First replicate: control 0% + first experimental half + control 100%
         rep1 <- df[c(control_rows[1], rep1_rows, control_rows[2]), col]
-        
-        # Second replicate: control 0% + second experimental half + control 100%
         rep2 <- df[c(control_rows[1], rep2_rows, control_rows[2]), col]
         
-        # Add to new table
         if (ncol(new_table) == 0) {
           new_table <- data.frame(rep1, rep2)
           colnames(new_table) <- c(col, paste0(col, ".2"))
@@ -523,7 +476,6 @@ ratio_dose_response <- function(data,
         }
       }
       
-      # Create new rownames for final table
       new_rownames <- c(
         rownames(df)[control_rows[1]],
         rownames(df)[rep1_rows],
@@ -538,24 +490,20 @@ ratio_dose_response <- function(data,
     ratio_modified_transposed
   }
   
-  # ADD log(inhibitor) COLUMN as first column
+  # Add log(inhibitor) column as first column
   if (!is.null(info_table)) {
     log_col <- info_table[[1]]
     n_needed <- nrow(final_table)
     
-    # CHECK AND CORRECT FIRST ROW
     if (length(log_col) > 0 && !is.na(log_col[1])) {
       warning("First row of log(inhibitor) is not NA. Shifting values and setting first row to NA.")
       
-      # Shift values down and add NA at the beginning
       adjusted_log_col <- c(NA, log_col[1:min(length(log_col), n_needed - 1)])
       
-      # Fill with NA if necessary
       if (length(adjusted_log_col) < n_needed) {
         adjusted_log_col <- c(adjusted_log_col, rep(NA, n_needed - length(adjusted_log_col)))
       }
     } else {
-      # Original behavior if first row is already NA
       adjusted_log_col <- if (length(log_col) >= n_needed) {
         log_col[1:n_needed]
       } else {
@@ -567,23 +515,20 @@ ratio_dose_response <- function(data,
     colnames(final_table)[1] <- colnames(info_table)[1]
   }
   
-  # SAVE TO EXCEL if requested
+  # Save to Excel if requested
   if (!is.null(save_to_excel)) {
     if (!requireNamespace("openxlsx", quietly = TRUE)) {
       stop("Package 'openxlsx' is required to save Excel files. Please install it.")
     }
     
     tryCatch({
-      # Create workbook
       wb <- openxlsx::createWorkbook()
       
-      # Add main table sheet
       openxlsx::addWorksheet(wb, "Modified_Ratio_Table")
       openxlsx::writeData(wb, "Modified_Ratio_Table", 
                           cbind(RowNames = rownames(final_table), final_table), 
                           rowNames = FALSE)
       
-      # Add original ratio table sheet if it exists
       if (!is.null(result$original_ratio_table)) {
         openxlsx::addWorksheet(wb, "Original_Ratio_Table")
         original_with_rownames <- cbind(RowNames = rownames(result$original_ratio_table), 
@@ -591,7 +536,6 @@ ratio_dose_response <- function(data,
         openxlsx::writeData(wb, "Original_Ratio_Table", original_with_rownames, rowNames = FALSE)
       }
       
-      # Add means sheets if they exist
       if (!is.null(result$general_means)) {
         openxlsx::addWorksheet(wb, "General_Means")
         openxlsx::writeData(wb, "General_Means", result$general_means)
@@ -602,7 +546,6 @@ ratio_dose_response <- function(data,
         openxlsx::writeData(wb, "Interval_Means", result$interval_means)
       }
       
-      # Save workbook
       openxlsx::saveWorkbook(wb, save_to_excel, overwrite = TRUE)
       if (verbose) message("Excel file saved successfully: ", save_to_excel)
       
@@ -611,7 +554,6 @@ ratio_dose_response <- function(data,
     })
   }
   
-  # Return results
   result$original_ratio_table <- ratio
   result$modified_ratio_table <- final_table
   
