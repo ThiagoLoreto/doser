@@ -21,7 +21,7 @@
 #'   IC50 values set to NA. Default is 60.
 #' @param r_squared_threshold Numeric value between 0 and 1 specifying the R² cutoff 
 #'   for curve quality assessment. Curves with R² below this value will be flagged 
-#'   as "Low R²" in the quality assessment (default: 0.5).
+#'   as "Low R²" in the quality assessment (default: 0.8).
 #'
 #' @return A list containing the following components:
 #' \itemize{
@@ -104,6 +104,7 @@
 #'   \item Response span (<20% flagged)
 #'   \item R-squared values (<0.5 flagged)
 #'   \item Biological plausibility of parameters
+#'   \item logIC50 range (>0.666 flagged)
 #' }
 #'
 #' @export
@@ -131,7 +132,7 @@
 
 fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = TRUE, 
                         enforce_bottom_threshold = FALSE, bottom_threshold = 60, 
-                        r_sqr_threshold = 0.5) {
+                        r_sqr_threshold = 0.8) {
   
   # Check and load required packages
   required_packages <- c("dplyr", "stats", "graphics", "grDevices")
@@ -468,7 +469,7 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
   }
   
   # Calculate curve quality metrics
-  calculate_curve_quality <- function(params, gof_results, plausibility_check = NULL) {
+  calculate_curve_quality <- function(params, gof_results, plausibility_check = NULL, logIC50_ci = NULL) {
     tryCatch({
       span <- params[5]
       max_slope <- -span * log(10) / 4
@@ -478,6 +479,13 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
       else if (abs(max_slope) < 15) quality_flags <- c(quality_flags, "Shallow slope")
       if (abs(span) < 20) quality_flags <- c(quality_flags, "Small span")
       if (gof_results$R_squared < r_sqr_threshold) quality_flags <- c(quality_flags, "Low R²")
+      if (!is.null(logIC50_ci) && !any(is.na(logIC50_ci))) {
+        ci_range <- abs(logIC50_ci[2] - logIC50_ci[1])
+        if (ci_range > 0.666) {
+          quality_flags <- c(quality_flags, "Wide logIC50 CI range")
+        }
+      }
+      
       if (!is.null(plausibility_check) && plausibility_check$needs_correction) {
         quality_flags <- c(quality_flags, "Parameters corrected (biologically implausible)")
       }
@@ -512,7 +520,7 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
                                    prepared$approx_ic50, 10^prepared$approx_ic50,
                                    prepared$max_response - prepared$min_response)
       result$curve_quality <- "Model failed - approximate parameters"
-      result$success <- TRUE
+      result$success = TRUE
       result$curve_type <- curve_type
       return(result)
     }
@@ -542,7 +550,7 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
       final_params <- initial_params
     }
     
-    curve_quality_info <- calculate_curve_quality(final_params, gof_results, plausibility_check)
+    curve_quality_info <- calculate_curve_quality(final_params, gof_results, plausibility_check, ci_results$LogIC50)
     
     ideal_hill_slope <- calculate_ideal_hill_slope(prepared$df_clean, final_params[1:3])
     
@@ -663,6 +671,17 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
     }
   }))
   
+  # Create final_summary_table (transposed version)
+  if (nrow(summary_table) > 0) {
+    compound_names <- summary_table$Compound
+    transposed_data <- as.data.frame(t(summary_table[, -1]))
+    colnames(transposed_data) <- compound_names
+    final_summary_table <- transposed_data
+    
+  } else {
+    final_summary_table <- data.frame()
+  }
+  
   # Identify compounds affected by threshold ONLY for inhibition
   threshold_affected <- character()
   if (enforce_bottom_threshold) {
@@ -721,8 +740,12 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
     file_ext <- tolower(tools::file_ext(output_file))
     
     if (file_ext == "xlsx" && requireNamespace("openxlsx", quietly = TRUE)) {
-      openxlsx::write.xlsx(summary_table, output_file)
-      if (verbose) cat("Results saved to Excel:", output_file, "\n")
+      sheets_list <- list(
+        "Summary" = summary_table,
+        "Final_Summary" = final_summary_table
+      )
+      openxlsx::write.xlsx(sheets_list, output_file)
+      if (verbose) cat("Results saved to Excel with two sheets:", output_file, "\n")
     } else {
       if (file_ext == "xlsx") {
         output_file <- sub("\\.xlsx$", ".csv", output_file, ignore.case = TRUE)
@@ -736,6 +759,7 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
   # Return results object
   list(
     summary_table = summary_table,
+    final_summary_table = final_summary_table,
     detailed_results = all_results,
     n_compounds = n_pairs,
     successful_fits = sum(!is.na(summary_table$IC50)),

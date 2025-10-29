@@ -72,6 +72,7 @@
 #' \item Maximum slope < 15: "Shallow slope"
 #' \item Span < 20: "Small span"
 #' \item Parameter corrections: "Parameters corrected"
+#' \item logIC50 range (>0.666 flagged)
 #' }
 #'
 #' @examples
@@ -89,9 +90,10 @@
 
 
 
-fit_drc_4pl <- function(data, output_file = NULL, normalize = FALSE, verbose = FALSE, 
+
+fit_drc_4pl <- function(data, output_file = NULL, normalize = FALSE, verbose = TRUE, 
                         enforce_bottom_threshold = FALSE, bottom_threshold = 60, 
-                        r_sqr_threshold = 0.5) {
+                        r_sqr_threshold = 0.8) {
   
   # Check and load required packages
   required_packages <- c("dplyr", "stats", "graphics", "grDevices")
@@ -466,7 +468,7 @@ fit_drc_4pl <- function(data, output_file = NULL, normalize = FALSE, verbose = F
   }
   
   # Calculate curve quality metrics
-  calculate_curve_quality <- function(params, gof_results, plausibility_check = NULL) {
+  calculate_curve_quality <- function(params, gof_results, plausibility_check = NULL, logIC50_ci = NULL) {
     tryCatch({
       span <- params[6]
       hill_slope <- params[4]
@@ -479,6 +481,15 @@ fit_drc_4pl <- function(data, output_file = NULL, normalize = FALSE, verbose = F
       else if (abs(max_slope) < 15) quality_flags <- c(quality_flags, "Shallow slope")
       if (abs(span) < 20) quality_flags <- c(quality_flags, "Small span")
       if (gof_results$R_squared < r_sqr_threshold) quality_flags <- c(quality_flags, "Low R²")
+      
+      # NOVA VERIFICAÇÃO: Intervalo de confiança do LogIC50 muito amplo
+      if (!is.null(logIC50_ci) && !any(is.na(logIC50_ci))) {
+        ci_range <- abs(logIC50_ci[2] - logIC50_ci[1])
+        if (ci_range > 0.666) {
+          quality_flags <- c(quality_flags, "Wide logIC50 CI range")
+        }
+      }
+      
       if (!is.null(plausibility_check) && plausibility_check$needs_correction) {
         quality_flags <- c(quality_flags, "Parameters corrected (biologically implausible)")
       }
@@ -550,7 +561,7 @@ fit_drc_4pl <- function(data, output_file = NULL, normalize = FALSE, verbose = F
       final_params <- initial_params
     }
     
-    curve_quality_info <- calculate_curve_quality(final_params, gof_results, plausibility_check)
+    curve_quality_info <- calculate_curve_quality(final_params, gof_results, plausibility_check, ci_results$LogIC50)
     
     list(
       parameters = data.frame(Parameter = PARAM_NAMES, Value = final_params, stringsAsFactors = FALSE),
@@ -671,6 +682,17 @@ fit_drc_4pl <- function(data, output_file = NULL, normalize = FALSE, verbose = F
     }
   }))
   
+  # Create final_summary_table (transposed version)
+  if (nrow(summary_table) > 0) {
+    compound_names <- summary_table$Compound
+    transposed_data <- as.data.frame(t(summary_table[, -1]))
+    colnames(transposed_data) <- compound_names
+    final_summary_table <- transposed_data
+    
+  } else {
+    final_summary_table <- data.frame()
+  }
+  
   # Identify compounds affected by threshold
   threshold_affected <- character()
   if (enforce_bottom_threshold) {
@@ -726,7 +748,7 @@ fit_drc_4pl <- function(data, output_file = NULL, normalize = FALSE, verbose = F
       }
     }
     
-    cat("  • Problematic curves: ", sum(grepl("shallow|Low R²|Small span", summary_table$Curve_Quality)), "\n")
+    cat("  • Problematic curves: ", sum(grepl("shallow|Low R²|Small span|Wide CI range", summary_table$Curve_Quality)), "\n")
     
     if ("Curve_Quality" %in% names(summary_table)) {
       cat("\nCURVE QUALITY DISTRIBUTION:\n")
@@ -744,8 +766,12 @@ fit_drc_4pl <- function(data, output_file = NULL, normalize = FALSE, verbose = F
     file_ext <- tolower(tools::file_ext(output_file))
     
     if (file_ext == "xlsx" && requireNamespace("openxlsx", quietly = TRUE)) {
-      openxlsx::write.xlsx(summary_table, output_file)
-      if (verbose) cat("Results saved to Excel:", output_file, "\n")
+      sheets_list <- list(
+        "Summary" = summary_table,
+        "Final_Summary" = final_summary_table
+      )
+      openxlsx::write.xlsx(sheets_list, output_file)
+      if (verbose) cat("Results saved to Excel with two sheets:", output_file, "\n")
     } else {
       if (file_ext == "xlsx") {
         output_file <- sub("\\.xlsx$", ".csv", output_file, ignore.case = TRUE)
@@ -756,9 +782,10 @@ fit_drc_4pl <- function(data, output_file = NULL, normalize = FALSE, verbose = F
     }
   }
   
-  # Return results object
+  # Return results object - MODIFICADA
   list(
     summary_table = summary_table,
+    final_summary_table = final_summary_table,  # NOVA TABELA
     detailed_results = all_results,
     n_compounds = n_pairs,
     successful_fits = sum(!is.na(summary_table$IC50)),
@@ -777,3 +804,4 @@ fit_drc_4pl <- function(data, output_file = NULL, normalize = FALSE, verbose = F
     parameter_order_corrections = order_corrections
   )
 }
+

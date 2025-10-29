@@ -11,7 +11,7 @@ fit_drc_3pl(
   verbose = TRUE,
   enforce_bottom_threshold = FALSE,
   bottom_threshold = 60,
-  r_sqr_threshold = 0.5
+  r_sqr_threshold = 0.8
 )
 }
 \arguments{
@@ -38,7 +38,7 @@ IC50 values set to NA. Default is 60.}
 
 \item{r_squared_threshold}{Numeric value between 0 and 1 specifying the R² cutoff
 for curve quality assessment. Curves with R² below this value will be flagged
-as "Low R²" in the quality assessment (default: 0.5).}
+as "Low R²" in the quality assessment (default: 0.8).}
 }
 \value{
 A list containing the following components:
@@ -109,6 +109,7 @@ Curves are automatically assessed for quality based on:
 \item Response span (<20\% flagged)
 \item R-squared values (<0.5 flagged)
 \item Biological plausibility of parameters
+\item logIC50 range (>0.666 flagged)
 }
 }
 

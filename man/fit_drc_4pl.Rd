@@ -8,10 +8,10 @@ fit_drc_4pl(
   data,
   output_file = NULL,
   normalize = FALSE,
-  verbose = FALSE,
+  verbose = TRUE,
   enforce_bottom_threshold = FALSE,
   bottom_threshold = 60,
-  r_sqr_threshold = 0.5
+  r_sqr_threshold = 0.8
 )
 }
 \arguments{
@@ -100,6 +100,7 @@ Curves are classified based on:
 \item Maximum slope < 15: "Shallow slope"
 \item Span < 20: "Small span"
 \item Parameter corrections: "Parameters corrected"
+\item logIC50 range (>0.666 flagged)
 }
 }
 
