@@ -2,7 +2,6 @@
 #'
 #' Transforms dose-response analysis results from wide to structured format,
 #' organizing parameters into logical sections following industry standards.
-#' Creates publication-ready tables suitable for reports and supplementary materials.
 #'
 #' @param results_table Data frame containing dose-response analysis results
 #'   from \code{\link{fit_dose_response}} function.
@@ -115,17 +114,36 @@
 
 
 reshape_dr_table <- function(results_table, output_file = NULL, decimal_comma = FALSE) {
-  # Check if table has expected structure
-  required_cols <- c("Compound", "Bottom", "Top", "LogIC50", "IC50", "Span", 
-                     "R_squared", "Syx", "Max_Slope", "Curve_Quality", "Degrees_of_Freedom")
   
-  if (!all(required_cols %in% colnames(results_table))) {
-    stop("Table does not have the expected dose-response analysis structure")
+  # Check if input is final_summary_table (transposed) or summary_table (original)
+  is_final_summary <- !"Compound" %in% colnames(results_table) && 
+    all(rownames(results_table) %in% c("Bottom", "Top", "LogIC50", "IC50", "Span", 
+                                       "Bottom_Lower_95CI", "Bottom_Upper_95CI",
+                                       "Top_Lower_95CI", "Top_Upper_95CI",
+                                       "LogIC50_Lower_95CI", "LogIC50_Upper_95CI",
+                                       "IC50_Lower_95CI", "IC50_Upper_95CI",
+                                       "R_squared", "Syx", "Sum_of_Squares", 
+                                       "Degrees_of_Freedom", "Max_Slope", 
+                                       "Ideal_Hill_Slope", "Curve_Quality"))
+  
+  if (is_final_summary) {
+    # Working with final_summary_table (already transposed)
+    transposed <- results_table
+    compound_names <- colnames(transposed)
+    
+  } else {
+    # Working with summary_table (original format) - maintain original logic
+    required_cols <- c("Compound", "Bottom", "Top", "LogIC50", "IC50", "Span", 
+                       "R_squared", "Syx", "Max_Slope", "Curve_Quality", "Degrees_of_Freedom")
+    
+    if (!all(required_cols %in% colnames(results_table))) {
+      stop("Table does not have the expected dose-response analysis structure")
+    }
+    
+    # Transpose table - compounds become columns
+    transposed <- as.data.frame(t(results_table[, -1]))
+    colnames(transposed) <- results_table$Compound
   }
-  
-  # Transpose table - compounds become columns
-  transposed <- as.data.frame(t(results_table[, -1]))
-  colnames(transposed) <- results_table$Compound
   
   # Define all sections and parameters in order
   sections <- list(
@@ -137,7 +155,8 @@ reshape_dr_table <- function(results_table, output_file = NULL, decimal_comma = 
          params = c("Bottom_Upper_95CI", "Top_Upper_95CI", "LogIC50_Upper_95CI", "IC50_Upper_95CI")),
     list(header = "Goodness of Fit", 
          params = c("Degrees_of_Freedom", "R_squared", "Sum_of_Squares", "Syx")),
-    list(header = NULL, params = c("Max_Slope", "Curve_Quality"))
+    list(header = "Additional Parameters", 
+         params = c("Max_Slope", "Ideal_Hill_Slope", "Curve_Quality"))
   )
   
   # Build final table structure

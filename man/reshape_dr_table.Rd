@@ -28,7 +28,6 @@ A data frame with the following structure:
 \description{
 Transforms dose-response analysis results from wide to structured format,
 organizing parameters into logical sections following industry standards.
-Creates publication-ready tables suitable for reports and supplementary materials.
 }
 \details{
 This function restructures dose-response analysis results into a standardized
