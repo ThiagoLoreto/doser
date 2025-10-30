@@ -9,7 +9,7 @@ plot_dose_response(
   compound_index = 1,
   y_limits = c(0, 150),
   point_color = "black",
-  line_color = "red",
+  line_color = "black",
   ic50_line_color = "gray",
   point_size = 1,
   line_width = 2,
@@ -40,7 +40,7 @@ dose-response analysis results.}
 
 \item{point_color}{Color for data points (default: "black").}
 
-\item{line_color}{Color for fitted curve (default: "red").}
+\item{line_color}{Color for fitted curve (default: "black").}
 
 \item{ic50_line_color}{Color for IC50 vertical line (default: "gray").}
 

@@ -9,7 +9,7 @@
 #' @param compound_index Numeric index specifying which compound to plot (default: 1).
 #' @param y_limits Numeric vector of length 2 specifying y-axis limits (default: c(0, 150)).
 #' @param point_color Color for data points (default: "black").
-#' @param line_color Color for fitted curve (default: "red").
+#' @param line_color Color for fitted curve (default: "black").
 #' @param ic50_line_color Color for IC50 vertical line (default: "gray").
 #' @param point_size Size multiplier for data points (default: 1).
 #' @param line_width Line width for fitted curve (default: 2).
@@ -166,7 +166,7 @@
 
 
 plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150), 
-                               point_color = "black", line_color = "red", 
+                               point_color = "black", line_color = "black", 
                                ic50_line_color = "gray", point_size = 1, 
                                line_width = 2, error_bar_width = 0.01,
                                show_ic50_line = TRUE, show_legend = TRUE,

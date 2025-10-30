@@ -28,7 +28,6 @@ Imports:
     utils,
     dplyr
 Suggests: 
-    dplyr,
     stringr,
     lmtest,
     testthat (>= 3.0.0)
