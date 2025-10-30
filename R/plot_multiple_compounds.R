@@ -1,23 +1,20 @@
-#' Plot Multiple Dose-Response Curves in a Single Graph
+#' Plot Multiple Dose-Response Curves Using ggplot2
 #'
-#' Creates composite plots showing multiple dose-response curves with advanced
-#' differentiation methods, professional styling, and flexible legend placement.
-#' Ideal for comparing multiple compounds or conditions in pharmacological studies.
+#' Creates composite plots showing multiple dose-response curves with professional
+#' styling, flexible legend placement, and intelligent defaults. Optimized for
+#' scientific publications with black-and-white or color output options.
 #'
 #' @param results List object returned by \code{\link{fit_dose_response}} containing
 #'   dose-response analysis results.
 #' @param compound_indices Numeric vector specifying which compounds to plot.
 #'   If NULL, plots all available compounds (default: NULL).
 #' @param y_limits Numeric vector of length 2 specifying y-axis limits (default: c(0, 150)).
-#' @param colors Character vector of colors for each compound. If NULL, generates
-#'   appropriate colors automatically (default: NULL).
-#' @param line_types Numeric vector of line types for each compound (default: NULL).
-#' @param point_shapes Numeric vector of point shapes for each compound (default: NULL).
-#' @param differentiation_method Character specifying how to differentiate curves:
-#'   "color", "linetype", "pointshape", or "combined" (default: "pointshape").
-#' @param legend_position Character specifying legend position: "bottomright", "bottom",
-#'   "bottomleft", "left", "topleft", "top", "topright", "right", or "outside"
-#'   (default: "outside").
+#' @param point_shapes Numeric vector of point shapes for each compound. If NULL,
+#'   generates optimal shapes automatically based on number of compounds (default: NULL).
+#' @param colors Character vector of colors for each compound. If NULL, uses black
+#'   for all compounds (default: NULL). Provide custom colors for colored output.
+#' @param legend_position Character specifying legend position: "right", "left",
+#'   "top", "bottom", or "none" (default: "right").
 #' @param show_grid Logical indicating whether to show background grid (default: FALSE).
 #' @param show_legend Logical indicating whether to show legend (default: TRUE).
 #' @param save_plot Either a file path for saving the plot, or TRUE for automatic naming
@@ -25,161 +22,138 @@
 #' @param plot_width Plot width in inches for saved plots (default: 10).
 #' @param plot_height Plot height in inches for saved plots (default: 8).
 #' @param plot_dpi Resolution for saved raster images (default: 600).
-#' @param axis_label_cex Character expansion factor for axis labels (default: 1.4).
-#' @param axis_number_cex Character expansion factor for axis numbers (default: 1.4).
-#' @param auto_combine_threshold Numeric threshold for automatically switching to
-#'   "combined" differentiation method (default: 12).
+#' @param axis_label_size Font size for axis labels (default: 14).
+#' @param axis_text_size Font size for axis numbers (default: 14).
 #' @param show_error_bars Logical indicating whether to show error bars (default: TRUE).
-#' @param error_bar_width Width of error bar ends (default: 0.03).
-#' @param error_bar_lwd Line width for error bars (default: 1).
+#' @param error_bar_width Width of error bar ends (default: 0.05).
 #' @param plot_title Character string for plot title (default: "Multiple Dose-Response Curves").
-#' @param legend_cex Character expansion factor for legend text (default: 0.8).
-#' @param legend_area_ratio Numeric ratio of plot area allocated to external legend
-#'   when legend_position = "outside" (default: 0.25).
-#' @param legend_point_cex Point size multiplier in legend (default: 1.0).
+#' @param legend_text_size Font size for legend text. If NULL, automatically adjusts
+#'   based on number of compounds (default: NULL).
+#' @param legend_title_size Font size for legend title (default: 11).
+#' @param legend_key_height Height of legend key in points. If NULL, automatically
+#'   adjusts based on number of compounds (default: NULL).
+#' @param legend_ncol Number of columns in legend. If NULL, automatically determines
+#'   optimal number (default: NULL).
+#' @param legend_label_wrap Maximum characters per line in legend labels before
+#'   wrapping (default: 25).
+#' @param plot_ratio Numeric ratio of plot area allocated to main plot vs legend
+#'   area (default: 0.7).
+#' @param legend_title Character string for legend title. If NULL, no title is shown
+#'   (default: NULL).
 #'
-#' @return Invisibly returns a list containing comprehensive plot metadata:
+#' @return Returns a ggplot object with comprehensive metadata stored as attributes:
 #' \itemize{
 #'   \item \code{compound_names}: Names of plotted compounds
 #'   \item \code{compound_indices}: Indices of plotted compounds
 #'   \item \code{n_compounds}: Number of compounds plotted
-#'   \item \code{plot_limits}: List with x and y axis limits used
-#'   \item \code{differentiation_method}: Method used for curve differentiation
-#'   \item \code{styling}: List with colors, line types, and point shapes used
-#'   \item \code{error_bars}: Error bar configuration
+#'   \item \code{point_shapes}: Point shapes used for each compound
+#'   \item \code{colors}: Colors used for each compound
+#'   \item \code{point_size}: Point size used in plot
 #'   \item \code{legend_position}: Legend position used
-#'   \item \code{legend_settings}: Legend configuration parameters
-#'   \item \code{plot_title}: Plot title used
-#'   \item \code{file_saved}: Path to saved file if plot was saved
-#'   \item \code{file_format}: Format of saved file
+#'   \item \code{legend_ncol}: Number of columns in legend
+#'   \item \code{legend_text_size}: Legend text size used
+#'   \item \code{legend_key_height}: Legend key height used
+#'   \item \code{legend_title}: Legend title used
+#'   \item \code{x_limits}: X-axis limits used
 #'   \item \code{plot_dimensions}: Dimensions of the plot (width, height, dpi)
-#'   \item \code{timestamp}: Time when plot was generated
+#'   \item \code{file_saved}: Path to saved file if plot was saved
 #' }
 #'
 #' @details
-#' This function creates sophisticated multi-curve dose-response plots with
-#' intelligent automatic styling and professional presentation. It automatically
-#' handles curve differentiation, legend placement, and output formatting for
-#' publication-quality figures.
+#' This function creates professional multi-curve dose-response plots using ggplot2
+#' with intelligent defaults optimized for scientific publications. The default
+#' styling uses black lines with different point shapes for optimal differentiation
+#' in black-and-white publications, while supporting custom colors for presentations.
 #'
-#' \strong{Automatic Features:}
+#' \strong{Key Features:}
 #' \itemize{
-#'   \item \strong{Smart Differentiation}: Auto-switches to combined methods for many compounds
-#'   \item \strong{Color Management}: Generates distinct color palettes based on compound count
-#'   \item \strong{Limit Calculation}: Automatically determines optimal axis limits from data
-#'   \item \strong{Error Bar Handling}: Only shows error bars when meaningful data exists
-#'   \item \strong{Layout Optimization}: Adjusts plot layout for external legends
+#'   \item \strong{Black-and-white optimized}: Default uses black lines with distinct point shapes
+#'   \item \strong{Smart point selection}: Automatically chooses optimal point shapes based on compound count
+#'   \item \strong{Adaptive sizing}: Point sizes and legend elements adjust based on number of compounds
+#'   \item \strong{Intelligent text wrapping}: Automatically wraps long compound names in legend
+#'   \item \strong{Professional styling}: Clean, publication-ready appearance with customizable elements
+#'   \item \strong{Self-contained}: No external package loading required
 #' }
 #'
-#' \strong{Differentiation Methods:}
+#' \strong{Automatic Adjustments:}
 #' \itemize{
-#'   \item \strong{color}: Uses distinct colors (optimal for 2-8 compounds)
-#'   \item \strong{linetype}: Uses line types 1-6 (repeats after 6 compounds)
-#'   \item \strong{pointshape}: Uses point shapes (optimal for 2-15 compounds)
-#'   \item \strong{combined}: Uses colors + line types + point shapes (best for 8+ compounds)
+#'   \item \strong{Point shapes}: Uses most distinguishable shapes first, recycles intelligently
+#'   \item \strong{Point size}: Larger points for few compounds (3.5), smaller for many (2.5)
+#'   \item \strong{Legend text}: Smaller text for many compounds (9pt), larger for few (11pt)
+#'   \item \strong{Legend columns}: Single column for ≤10 compounds, two columns for >10 compounds
+#'   \item \strong{X-axis limits}: Automatically calculated from data with 5% margin
 #' }
 #'
 #' @examples
 #' \dontrun{
-#' # Example 1: Publication-ready multi-panel comparison
+#' # Example 1: Default black-and-white with automatic point shapes
 #' analysis_results <- fit_dose_response(my_data, normalize = TRUE)
 #' 
-#' # Create comparison of different compound classes
-#' control_compounds <- c(1, 2, 3)   # Reference compounds
-#' test_compounds <- c(4, 5, 6, 7)   # Experimental compounds
-#' 
-#' # Plot controls
-#' plot_multiple_compounds(
+#' # Plot compounds with default settings (black lines, different point shapes)
+#' p <- plot_multiple_compounds(
 #'   analysis_results,
-#'   compound_indices = control_compounds,
-#'   differentiation_method = "color",
-#'   colors = c("gray40", "gray60", "gray80"),
-#'   plot_title = "Control Compounds",
-#'   legend_position = "bottomright"
+#'   compound_indices = c(1, 3, 5, 7),
+#'   plot_title = "Selected Compound Comparison"
 #' )
+#' print(p)
 #' 
-#' # Plot test compounds with bright colors
-#' plot_multiple_compounds(
+#' # Example 2: Custom colors for presentation
+#' p <- plot_multiple_compounds(
 #'   analysis_results,
-#'   compound_indices = test_compounds,
-#'   differentiation_method = "color",
-#'   colors = c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3"), # ColorBrewer colors
-#'   plot_title = "Experimental Compounds",
-#'   legend_position = "bottomright"
+#'   compound_indices = 1:4,
+#'   colors = c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3"), # ColorBrewer palette
+#'   plot_title = "Colored Dose-Response Curves",
+#'   legend_title = "Test Compounds"
 #' )
+#' print(p)
 #' 
-#' # Example 2: Black and white publication figure
-#' plot_multiple_compounds(
+#' # Example 3: Publication-ready with custom point shapes
+#' p <- plot_multiple_compounds(
 #'   analysis_results,
 #'   compound_indices = 1:6,
-#'   differentiation_method = "combined",
-#'   colors = rep("black", 6),  # All black lines
-#'   line_types = 1:6,          # Different line types
-#'   point_shapes = 15:20,      # Different point shapes
-#'   plot_title = "Dose-Response Curves (Black & White)",
-#'   save_plot = "bw_figure.tiff",
-#'   plot_dpi = 1200
+#'   point_shapes = c(15, 16, 17, 18, 0, 1), # Specific shapes
+#'   plot_title = "Custom Point Shapes",
+#'   legend_position = "bottom",
+#'   legend_ncol = 3
 #' )
+#' print(p)
 #' 
-#' # Example 3: Large dataset with external legend
-#' plot_multiple_compounds(
+#' # Example 4: Many compounds with optimized layout
+#' p <- plot_multiple_compounds(
 #'   analysis_results,
-#'   compound_indices = 1:20,
-#'   differentiation_method = "combined",
-#'   legend_position = "outside",
-#'   legend_area_ratio = 0.4,    # More space for legend
-#'   legend_cex = 0.6,           # Smaller legend text
-#'   plot_title = "High-Throughput Screening Results",
-#'   plot_width = 14,            # Wider plot for many compounds
-#'   plot_height = 8
+#'   compound_indices = 1:15,
+#'   plot_title = "High-Throughput Screening",
+#'   legend_text_size = 8,
+#'   plot_width = 12,
+#'   save_plot = "screening_results.png"
 #' )
+#' print(p)
 #' 
-#' # Example 4: Custom styling for specific comparisons
-#' custom_colors <- c(
-#'   "Compound_A" = "#1B9E77",
-#'   "Compound_B" = "#D95F02", 
-#'   "Compound_C" = "#7570B3",
-#'   "Compound_D" = "#E7298A"
-#' )
-#' 
-#' plot_multiple_compounds(
+#' # Example 5: Access and use plot metadata
+#' p <- plot_multiple_compounds(
 #'   analysis_results,
-#'   compound_indices = c(2, 5, 8, 11),
-#'   colors = custom_colors,
-#'   line_types = c(1, 2, 1, 2),      # Alternating line types
-#'   point_shapes = c(16, 17, 15, 18), # Distinct point shapes
-#'   plot_title = "Selected Compound Comparison",
-#'   show_error_bars = TRUE
+#'   compound_indices = c(2, 4, 6)
 #' )
 #' 
-#' # Example 5: Access and use detailed metadata
-#' plot_meta <- plot_multiple_compounds(
-#'   analysis_results,
-#'   compound_indices = 1:8,
-#'   differentiation_method = "combined"
-#' )
+#' # Extract metadata for reproducibility
+#' meta <- attr(p, "metadata")
+#' cat("Plotted", meta$n_compounds, "compounds\n")
+#' cat("Point shapes:", meta$point_shapes, "\n")
+#' cat("X-axis range:", round(meta$x_limits, 2), "\n")
 #' 
-#' # Create a plot summary report
-#' cat("Multi-Curve Plot Summary:\n")
-#' cat("Compounds plotted:", plot_meta$n_compounds, "\n")
-#' cat("Differentiation method:", plot_meta$differentiation_method, "\n")
-#' cat("X-axis range:", round(plot_meta$plot_limits$x_limits, 2), "\n")
-#' cat("Y-axis range:", plot_meta$plot_limits$y_limits, "\n")
-#' cat("Colors used:", length(unique(plot_meta$styling$colors)), "unique colors\n")
-#' cat("Generated:", format(plot_meta$timestamp, "%Y-%m-%d %H:%M"), "\n")
-#' 
-#' # Save styling information for reproducibility
-#' write.csv(
-#'   data.frame(
-#'     Compound = plot_meta$compound_names,
-#'     Color = plot_meta$styling$colors,
-#'     LineType = plot_meta$styling$line_types,
-#'     PointShape = plot_meta$styling$point_shapes
-#'   ),
-#'   "plot_styling_reference.csv",
-#'   row.names = FALSE
+#' # Save styling information
+#' styling_info <- data.frame(
+#'   Compound = meta$compound_names,
+#'   PointShape = meta$point_shapes,
+#'   Color = meta$colors
 #' )
+#' write.csv(styling_info, "plot_styling.csv", row.names = FALSE)
 #' }
+#'
+#' @seealso
+#' \code{\link{fit_dose_response}} for generating input data
+#' \code{\link[ggplot2]{ggplot}} for underlying plotting functionality
+#'
 #' @export
 
 
@@ -188,22 +162,30 @@
 
 
 plot_multiple_compounds <- function(results, compound_indices = NULL, 
-                                    y_limits = c(0, 150), colors = NULL,
-                                    line_types = NULL, point_shapes = NULL,
-                                    differentiation_method = "pointshape",
-                                    legend_position = "outside",
+                                    y_limits = c(0, 150),
+                                    point_shapes = NULL,
+                                    colors = NULL,
+                                    legend_position = "right",
                                     show_grid = FALSE, show_legend = TRUE,
                                     save_plot = NULL, plot_width = 10, 
                                     plot_height = 8, plot_dpi = 600,
-                                    axis_label_cex = 1.4, axis_number_cex = 1.4,
-                                    auto_combine_threshold = 12,
+                                    axis_label_size = 14,
+                                    axis_text_size = 14,
                                     show_error_bars = TRUE,
-                                    error_bar_width = 0.03,
-                                    error_bar_lwd = 1,
+                                    error_bar_width = 0.05,
                                     plot_title = "Multiple Dose-Response Curves",
-                                    legend_cex = 0.8,                    
-                                    legend_area_ratio = 0.25,         
-                                    legend_point_cex = 1.0) {         
+                                    legend_text_size = NULL,
+                                    legend_title_size = 11,
+                                    legend_key_height = NULL,
+                                    legend_ncol = NULL,
+                                    legend_label_wrap = 25,
+                                    plot_ratio = 0.7,
+                                    legend_title = NULL) {
+  
+  # Check if required packages are installed
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("ggplot2 package is required. Please install it with: install.packages('ggplot2')")
+  }
   
   # Input validation
   if (is.null(compound_indices)) {
@@ -220,135 +202,329 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
     stop("Compound indices exceed available compounds")
   }
   
-  if (!is.character(plot_title) || length(plot_title) != 1) {
-    stop("plot_title must be a single character string")
+  # Validate parameters
+  if (plot_ratio <= 0 || plot_ratio >= 1) {
+    stop("plot_ratio must be between 0 and 1 (exclusive)")
   }
   
-  # Validate legend position
-  valid_positions <- c("bottomright", "bottom", "bottomleft", "left", 
-                       "topleft", "top", "topright", "right", "outside")
+  valid_positions <- c("right", "left", "top", "bottom", "none")
   if (!legend_position %in% valid_positions) {
     stop("legend_position must be one of: '", paste(valid_positions, collapse = "', '"), "'")
   }
   
-  # Validate legend_area_ratio
-  if (legend_area_ratio <= 0 || legend_area_ratio >= 1) {
-    stop("legend_area_ratio must be between 0 and 1 (exclusive)")
+  # Smart defaults for legend based on number of compounds
+  if (is.null(legend_text_size)) {
+    legend_text_size <- if (n_compounds > 15) 9 else
+      if (n_compounds > 8) 10 else 11
   }
   
-  # Validate differentiation method
-  valid_methods <- c("color", "linetype", "pointshape", "combined")
-  if (!differentiation_method %in% valid_methods) {
-    stop("differentiation_method must be one of: '", paste(valid_methods, collapse = "', '"), "'")
+  if (is.null(legend_key_height)) {
+    legend_key_height <- if (n_compounds > 15) 12 else 15
   }
   
-  original_method <- differentiation_method
+  # Extract compound data and prepare for plotting
+  curve_data <- list()
+  point_data <- list()
   
-  # Auto-switch to combined method for many compounds
-  if (n_compounds > auto_combine_threshold && differentiation_method != "combined") {
-    if (differentiation_method == "linetype" && n_compounds > 6) {
-      differentiation_method <- "combined"
-      message("Auto-switching to 'combined' method: ", n_compounds, 
-              " compounds exceed the 6 available line types")
-    } else if (differentiation_method == "pointshape" && n_compounds > 15) {
-      differentiation_method <- "combined"
-      message("Auto-switching to 'combined' method: ", n_compounds, 
-              " compounds exceed the 15 available point shapes")
+  for (i in seq_along(compound_indices)) {
+    idx <- compound_indices[i]
+    result <- results$detailed_results[[idx]]
+    
+    if (is.null(result$model) || !isTRUE(result$success)) {
+      warning("Compound ", idx, ": no successful model fit - skipping")
+      next
     }
-  }
-  
-  # Generate default colors
-  if (is.null(colors)) {
-    if (differentiation_method %in% c("color", "combined")) {
-      colors <- if (n_compounds <= 8) {
-        c("blue", "red", "green", "purple", "orange", "brown", "pink", "gray")
-      } else if (n_compounds <= 15) {
-        c("blue", "red", "green", "purple", "orange", "brown", "pink", "gray",
-          "darkblue", "darkred", "darkgreen", "cyan", "magenta", "yellow", "black")
-      } else {
-        grDevices::rainbow(n_compounds)
+    
+    compound_name <- strsplit(result$compound, " \\| ")[[1]][1]
+    
+    # Prepare curve data
+    data <- result$data
+    valid_data <- data[is.finite(data$log_inhibitor) & is.finite(data$response), ]
+    
+    if (nrow(valid_data) < 2) {
+      warning("Compound ", compound_name, ": insufficient data - skipping")
+      next
+    }
+    
+    # Generate fitted curve
+    x_range <- range(valid_data$log_inhibitor, na.rm = TRUE)
+    x_seq <- seq(x_range[1], x_range[2], length.out = 100)
+    pred_df <- data.frame(
+      log_inhibitor = x_seq,
+      response = predict(result$model, newdata = data.frame(log_inhibitor = x_seq)),
+      compound = compound_name,
+      compound_index = i
+    )
+    
+    curve_data[[i]] <- pred_df
+    
+    # Prepare point data with means and SDs
+    conc_levels <- unique(valid_data$log_inhibitor)
+    
+    point_stats <- data.frame(
+      log_inhibitor = numeric(0),
+      mean_response = numeric(0),
+      sd_response = numeric(0),
+      compound = character(0),
+      compound_index = numeric(0)
+    )
+    
+    for (conc in conc_levels) {
+      conc_responses <- valid_data$response[valid_data$log_inhibitor == conc]
+      if (length(conc_responses) > 0) {
+        point_stats <- rbind(point_stats, data.frame(
+          log_inhibitor = conc,
+          mean_response = mean(conc_responses, na.rm = TRUE),
+          sd_response = sd(conc_responses, na.rm = TRUE),
+          compound = compound_name,
+          compound_index = i
+        ))
       }
-    } else {
-      colors <- rep("black", n_compounds)
     }
+    
+    point_data[[i]] <- point_stats
   }
   
-  # Ensure sufficient colors
-  if (length(colors) < n_compounds) {
-    if (differentiation_method %in% c("color", "combined")) {
-      warning("Insufficient number of colors, generating additional colors automatically")
-      colors <- c(colors, grDevices::rainbow(n_compounds - length(colors)))
-    } else {
-      colors <- rep(colors, length.out = n_compounds)
-    }
+  # Combine all data
+  all_curve_data <- do.call(rbind, curve_data)
+  all_point_data <- do.call(rbind, point_data)
+  
+  if (is.null(all_curve_data) || nrow(all_curve_data) == 0) {
+    stop("No valid data to plot")
   }
   
-  # Generate default line types
-  if (is.null(line_types)) {
-    if (differentiation_method == "linetype" && n_compounds > 6) {
-      warning("Only 6 line types available in R. Using repeated line types for ", n_compounds, " compounds")
-    }
-    line_types <- rep(1:6, length.out = n_compounds)
-  } else {
-    line_types <- rep(line_types, length.out = n_compounds)
-  }
-  
-  # Generate default point shapes
+  # Smart point shape selection
   if (is.null(point_shapes)) {
-    base_point_shapes <- c(16, 17, 15, 18, 8, 1, 2, 0, 5, 6, 7, 10, 11, 12, 13, 14)
-    point_shapes <- rep(base_point_shapes, length.out = n_compounds)
+    optimal_shapes <- c(16, 17, 15, 18, 8, 1, 2, 0, 5, 6, 7, 10, 11, 12, 13, 14)
+    
+    if (n_compounds <= 6) {
+      point_shapes <- optimal_shapes[1:n_compounds]
+    } else {
+      point_shapes <- rep(optimal_shapes, length.out = n_compounds)
+    }
   } else {
     point_shapes <- rep(point_shapes, length.out = n_compounds)
   }
   
-  # User guidance for many compounds
-  if (n_compounds > 6 && original_method == "linetype") {
-    message("For ", n_compounds, " compounds with line types:")
-    message("  - Only 6 unique line types available in R")
-    message("  - Line types will repeat after the 6th compound")
-    message("  - Consider using differentiation_method = 'combined' for better distinction")
+  # Color logic: default is black, but allows custom colors
+  use_colors <- if (!is.null(colors)) {
+    if (length(colors) < n_compounds) {
+      warning("Number of colors provided (", length(colors), ") is less than number of compounds (", n_compounds, "). Recycling colors.")
+      rep(colors, length.out = n_compounds)
+    } else {
+      colors[1:n_compounds]
+    }
+  } else {
+    rep("black", n_compounds)
   }
   
-  if (n_compounds > 15 && differentiation_method != "combined") {
-    message("Recommendation: For ", n_compounds, " compounds, use differentiation_method = 'combined'")
-    message("  This combines colors + line types + point shapes for maximum differentiation")
+  # Smart text wrapping for long compound names
+  smart_label_wrap <- function(labels, width = legend_label_wrap) {
+    sapply(labels, function(label) {
+      if (nchar(label) <= width) return(label)
+      
+      # Try to break at hyphens or underscores first
+      if (grepl("[-_]", label)) {
+        parts <- strsplit(label, "[-_]")[[1]]
+        if (length(parts) > 1 && any(nchar(parts) <= width)) {
+          best_break <- which(cumsum(nchar(parts) + 1) <= width)
+          if (length(best_break) > 0) {
+            break_point <- max(best_break)
+            line1 <- paste(parts[1:break_point], collapse = "-")
+            line2 <- paste(parts[(break_point + 1):length(parts)], collapse = "-")
+            return(paste(line1, line2, sep = "\n"))
+          }
+        }
+      }
+      
+      # Break by words
+      words <- strsplit(label, " ")[[1]]
+      if (length(words) > 1) {
+        lines <- character(0)
+        current_line <- ""
+        
+        for (word in words) {
+          test_line <- if (current_line == "") word else paste(current_line, word)
+          if (nchar(test_line) <= width) {
+            current_line <- test_line
+          } else {
+            if (current_line != "") lines <- c(lines, current_line)
+            current_line <- word
+          }
+        }
+        if (current_line != "") lines <- c(lines, current_line)
+        
+        if (length(lines) <= 3) {
+          return(paste(lines, collapse = "\n"))
+        }
+      }
+      
+      # Simple break for very long single words
+      if (nchar(label) > width * 2) {
+        part1 <- substr(label, 1, width)
+        part2 <- substr(label, width + 1, width * 2)
+        part3 <- substr(label, (width * 2) + 1, nchar(label))
+        return(paste(part1, part2, part3, sep = "\n"))
+      } else {
+        mid <- ceiling(nchar(label) / 2)
+        space_pos <- gregexpr(" ", substr(label, mid - 5, mid + 5))[[1]]
+        if (any(space_pos > 0)) {
+          break_point <- mid - 6 + min(space_pos[space_pos > 0])
+        } else {
+          break_point <- mid
+        }
+        return(paste(substr(label, 1, break_point), 
+                     substr(label, break_point + 1, nchar(label)), sep = "\n"))
+      }
+    })
   }
   
-  # Extract compound names
-  compound_names_clean <- sapply(compound_indices, function(i) {
-    strsplit(results$detailed_results[[i]]$compound, " \\| ")[[1]][1]
-  })
+  # Apply text wrapping
+  compound_labels <- unique(all_curve_data$compound)
+  wrapped_labels <- smart_label_wrap(compound_labels, legend_label_wrap)
   
-  # Calculate X-axis limits from all compounds
-  all_log_inhibitors <- numeric(0)
-  for (idx in compound_indices) {
-    result <- results$detailed_results[[idx]]
-    if (!is.null(result$model) && isTRUE(result$success)) {
-      data <- result$data
-      n_rows <- nrow(data) / 2
-      control_vals <- data$log_inhibitor[c(1, n_rows)]
-      plot_data <- data[!data$log_inhibitor %in% control_vals, ]
-      
-      if (nrow(plot_data) < 2) plot_data <- data
-      
-      valid_log_inhibitors <- plot_data$log_inhibitor[is.finite(plot_data$log_inhibitor)]
-      all_log_inhibitors <- c(all_log_inhibitors, valid_log_inhibitors)
+  # Calculate optimal X-axis limits
+  calculate_x_limits <- function(curve_data, point_data) {
+    all_x <- c(curve_data$log_inhibitor, point_data$log_inhibitor)
+    valid_x <- all_x[is.finite(all_x)]
+    
+    if (length(valid_x) == 0) return(c(-10, -2))
+    
+    x_range <- range(valid_x)
+    x_margin <- diff(x_range) * 0.05
+    return(c(x_range[1] - x_margin, x_range[2] + x_margin))
+  }
+  
+  x_limits <- calculate_x_limits(all_curve_data, all_point_data)
+  
+  # Adaptive point size based on number of compounds
+  point_size <- if (n_compounds > 15) 2.5 else 
+    if (n_compounds > 8) 3 else 3.5
+  
+  # Final legend title (NULL = no title)
+  legend_title_final <- if (!is.null(legend_title)) legend_title else NULL
+  
+  # Create base plot
+  p <- ggplot2::ggplot() +
+    ggplot2::labs(
+      x = expression(paste("Log"[10], " Concentration [M]")),
+      y = ifelse(results$normalized, "Normalized BRET ratio [%]", "BRET ratio"),
+      title = plot_title,
+      shape = legend_title_final
+    ) +
+    ggplot2::coord_cartesian(xlim = x_limits, ylim = y_limits) +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      axis.title = ggplot2::element_text(size = axis_label_size, face = "bold", color = "black"),
+      axis.text = ggplot2::element_text(size = axis_text_size, color = "black"),
+      axis.line = ggplot2::element_line(color = "black"),
+      axis.ticks = ggplot2::element_line(color = "black"),
+      plot.title = ggplot2::element_text(size = axis_label_size + 2, face = "bold", hjust = 0.5, color = "black"),
+      legend.position = legend_position,
+      legend.text = ggplot2::element_text(size = legend_text_size, lineheight = 0.8, color = "black"),
+      legend.title = ggplot2::element_text(size = legend_title_size, face = "bold", color = "black"),
+      legend.key.height = ggplot2::unit(legend_key_height, "points"),
+      legend.key = ggplot2::element_rect(fill = "white", color = NA),
+      legend.background = ggplot2::element_rect(fill = "white", color = NA),
+      panel.grid.major = ggplot2::element_line(color = ifelse(show_grid, "grey90", "white")),
+      panel.grid.minor = ggplot2::element_line(color = ifelse(show_grid, "grey95", "white")),
+      panel.background = ggplot2::element_rect(fill = "white", color = NA),
+      plot.background = ggplot2::element_rect(fill = "white", color = NA)
+    )
+  
+  # Add plot elements with color control
+  if (!is.null(colors)) {
+    # COLOR MODE: colored lines and points
+    p <- p +
+      ggplot2::geom_line(data = all_curve_data, 
+                         aes(x = log_inhibitor, y = response, group = compound, color = compound),
+                         linewidth = 1, alpha = 0.7) +
+      ggplot2::geom_point(data = all_point_data,
+                          aes(x = log_inhibitor, y = mean_response, shape = compound, color = compound),
+                          size = point_size) +
+      ggplot2::scale_color_manual(
+        values = use_colors,
+        labels = wrapped_labels,
+        guide = "none"
+      ) +
+      ggplot2::scale_shape_manual(
+        values = point_shapes[1:n_compounds],
+        labels = wrapped_labels
+      )
+    
+    if (show_error_bars && nrow(all_point_data) > 0) {
+      p <- p +
+        ggplot2::geom_errorbar(data = all_point_data,
+                               aes(x = log_inhibitor, 
+                                   ymin = mean_response - sd_response, 
+                                   ymax = mean_response + sd_response,
+                                   group = compound, color = compound),
+                               width = error_bar_width, 
+                               linewidth = 0.5)
+    }
+  } else {
+    # DEFAULT MODE: all black
+    p <- p +
+      ggplot2::geom_line(data = all_curve_data, 
+                         aes(x = log_inhibitor, y = response, group = compound),
+                         color = "black", linewidth = 1, alpha = 0.7) +
+      ggplot2::geom_point(data = all_point_data,
+                          aes(x = log_inhibitor, y = mean_response, shape = compound),
+                          color = "black", size = point_size) +
+      ggplot2::scale_shape_manual(
+        values = point_shapes[1:n_compounds],
+        labels = wrapped_labels
+      )
+    
+    if (show_error_bars && nrow(all_point_data) > 0) {
+      p <- p +
+        ggplot2::geom_errorbar(data = all_point_data,
+                               aes(x = log_inhibitor, 
+                                   ymin = mean_response - sd_response, 
+                                   ymax = mean_response + sd_response,
+                                   group = compound),
+                               color = "black",
+                               width = error_bar_width, 
+                               linewidth = 0.5)
     }
   }
   
-  # Determine x_limits with fallback
-  if (length(all_log_inhibitors) == 0) {
-    x_limits <- c(-10, -2)
-    warning("No valid log_inhibitor values found, using default limits")
+  # Configure legend columns
+  if (!is.null(legend_ncol)) {
+    ncol_final <- legend_ncol
   } else {
-    x_limits <- range(all_log_inhibitors, na.rm = TRUE)
+    ncol_final <- if (n_compounds > 10) 2 else 1
   }
   
-  # Plot saving setup 
-  plot_saved <- FALSE
-  original_dev <- grDevices::dev.cur()
-  filename <- NULL
+  # Configure legend appearance
+  if (!is.null(colors)) {
+    p <- p + ggplot2::guides(
+      shape = ggplot2::guide_legend(
+        ncol = ncol_final,
+        override.aes = list(
+          color = use_colors,
+          size = point_size
+        )
+      )
+    )
+  } else {
+    p <- p + ggplot2::guides(
+      shape = ggplot2::guide_legend(
+        ncol = ncol_final,
+        override.aes = list(
+          color = "black",
+          size = point_size
+        )
+      )
+    )
+  }
   
+  # Hide legend if requested
+  if (!show_legend) {
+    p <- p + ggplot2::theme(legend.position = "none")
+  }
+  
+  # Save plot if requested
   if (!is.null(save_plot)) {
     if (is.character(save_plot)) {
       filename <- save_plot
@@ -364,241 +540,28 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
       dir.create(plot_dir, recursive = TRUE, showWarnings = FALSE)
     }
     
-    file_ext <- tolower(tools::file_ext(filename))
-    supported_formats <- c("png", "jpg", "jpeg", "tiff", "pdf", "svg")
-    
-    if (!file_ext %in% supported_formats) {
-      warning("Unsupported format '", file_ext, "'. Using PNG instead.")
-      filename <- sub(paste0("\\.", file_ext, "$"), ".png", filename, ignore.case = TRUE)
-      file_ext <- "png"
-    }
-    
-    if (grDevices::dev.cur() != 1) {
-      grDevices::dev.off()
-    }
-    
-    switch(file_ext,
-           png = grDevices::png(filename, width = plot_width, height = plot_height, 
-                                units = "in", res = plot_dpi, bg = "white"),
-           jpg = grDevices::jpeg(filename, width = plot_width, height = plot_height, 
-                                 units = "in", res = plot_dpi, quality = 90, bg = "white"),
-           jpeg = grDevices::jpeg(filename, width = plot_width, height = plot_height, 
-                                  units = "in", res = plot_dpi, quality = 90, bg = "white"),
-           tiff = grDevices::tiff(filename, width = plot_width, height = plot_height, 
-                                  units = "in", res = plot_dpi, compression = "lzw", bg = "white"),
-           pdf = grDevices::pdf(filename, width = plot_width, height = plot_height, 
-                                bg = "white", pointsize = 12),
-           svg = grDevices::svg(filename, width = plot_width, height = plot_height, 
-                                bg = "white")
-    )
-    
-    plot_saved <- TRUE
-    on.exit({
-      if (grDevices::dev.cur() != 1) {
-        grDevices::dev.off()
-      }
-      # Restaurar dispositivo original se necessário
-      if (original_dev > 1 && grDevices::dev.cur() == 1) {
-        grDevices::dev.set(original_dev)
-      }
-    })
-  }
-  
-  # Adjust layout for external legend
-  if (legend_position == "outside") {
-    original_par <- graphics::par(no.readonly = TRUE)
-    on.exit(graphics::par(original_par), add = TRUE)
-    
-    # Calculate layout based on legend_area_ratio
-    plot_ratio <- (1 - legend_area_ratio) / legend_area_ratio
-    layout_widths <- c(plot_ratio, 1)
-    
-    # Create layout with main plot and legend area
-    layout_matrix <- matrix(c(1, 2), nrow = 1, ncol = 2, byrow = TRUE)
-    graphics::layout(layout_matrix, widths = layout_widths)
-    
-    # Set margins for main plot (left plot)
-    graphics::par(mar = c(5.1, 4.1, 4.1, 2.1))
-  }
-  
-  # Create base plot
-  graphics::plot(NA, xlim = x_limits, ylim = y_limits,
-                 xlab = expression(paste("Log"[10], " Concentration [M]")), 
-                 ylab = ifelse(results$normalized, 
-                               "Normalized BRET ratio [%]", 
-                               "BRET ratio"),
-                 main = plot_title,
-                 cex.lab = axis_label_cex,
-                 cex.axis = axis_number_cex)
-  
-  if (show_grid) {
-    graphics::grid()
-  }
-  
-  # Styling configuration
-  styling_config <- list(
-    color = list(lty = 1, pch = NA, show_points = FALSE),
-    linetype = list(lty = line_types, pch = NA, show_points = FALSE),
-    pointshape = list(lty = 1, pch = point_shapes, show_points = TRUE),
-    combined = list(lty = line_types, pch = point_shapes, show_points = TRUE)
-  )
-  
-  current_style <- styling_config[[differentiation_method]]
-  
-  # Error bars function
-  add_error_bars <- function(x, y_mean, y_sd, color, bar_width, lwd) {
-    if (length(x) == 0 || any(is.na(y_sd))) return()
-    
-    x_left <- x - bar_width/2
-    x_right <- x + bar_width/2
-    
-    graphics::segments(x_left, y_mean, x_right, y_mean, col = color, lwd = lwd)
-    
-    for (i in seq_along(x)) {
-      if (!is.na(y_sd[i]) && y_sd[i] > 0) {
-        y_top <- y_mean[i] + y_sd[i]
-        y_bottom <- y_mean[i] - y_sd[i]
-        
-        graphics::segments(x[i], y_bottom, x[i], y_top, col = color, lwd = lwd)
-        graphics::segments(x_left[i], y_top, x_right[i], y_top, col = color, lwd = lwd)
-        graphics::segments(x_left[i], y_bottom, x_right[i], y_bottom, col = color, lwd = lwd)
-      }
-    }
-  }
-  
-  # Plot each compound
-  for (i in seq_along(compound_indices)) {
-    idx <- compound_indices[i]
-    result <- results$detailed_results[[idx]]
-    
-    if (is.null(result$model) || !isTRUE(result$success)) {
-      warning("Compound ", compound_names_clean[i], ": no successful model fit - skipping")
-      next
-    }
-    
-    data <- result$data
-    n_rows <- nrow(data) / 2
-    control_vals <- data$log_inhibitor[c(1, n_rows)]
-    plot_data <- data[!data$log_inhibitor %in% control_vals, ]
-    
-    if (nrow(plot_data) < 2) plot_data <- data
-    
-    valid_data <- plot_data[is.finite(plot_data$log_inhibitor), ]
-    
-    if (nrow(valid_data) < 2) {
-      warning("Compound ", compound_names_clean[i], ": insufficient data to generate curve")
-      next
-    }
-    
-    # Generate and plot fitted curve
-    x_range <- range(valid_data$log_inhibitor, na.rm = TRUE)
-    x_seq <- seq(x_range[1], x_range[2], length.out = 100)
-    pred_df <- data.frame(log_inhibitor = x_seq)
-    pred_df$response <- predict(result$model, newdata = pred_df)
-    
-    graphics::lines(pred_df$log_inhibitor, pred_df$response, 
-                    col = colors[i], 
-                    lty = ifelse(length(current_style$lty) == 1, 
-                                 current_style$lty, current_style$lty[i]),
-                    lwd = 2)
-    
-    # Add points if using point-based differentiation
-    if (current_style$show_points) {
-      conc_levels <- unique(valid_data$log_inhibitor)
-      
-      mean_responses <- vapply(conc_levels, function(conc) {
-        mean(valid_data$response[valid_data$log_inhibitor == conc], na.rm = TRUE)
-      }, numeric(1))
-      
-      sd_responses <- vapply(conc_levels, function(conc) {
-        sd(valid_data$response[valid_data$log_inhibitor == conc], na.rm = TRUE)
-      }, numeric(1))
-      
-      graphics::points(conc_levels, mean_responses, 
-                       pch = current_style$pch[i], 
-                       col = colors[i], 
-                       cex = 1.2)
-      
-      if (show_error_bars) {
-        add_error_bars(conc_levels, mean_responses, sd_responses, 
-                       colors[i], error_bar_width, error_bar_lwd)
-      }
-    }
-  }
-  
-  # Add legend
-  if (show_legend) {
-    legend_params <- list(
-      legend = compound_names_clean,
-      bty = "n",
-      col = colors,
-      cex = legend_cex
-    )
-    
-    if (legend_position == "outside") {
-      # Switch to legend area (right panel) with adequate margins
-      graphics::par(mar = c(5.1, 0.001, 4.1, 0.001))
-      graphics::plot.new()
-      
-      legend_params$x <- "center"
-    } else {
-      legend_params$x <- legend_position
-    }
-    
-    # Apply styling based on differentiation method
-    if (differentiation_method == "color") {
-      legend_params$lwd <- 2
-      legend_params$lty <- 1
-      legend_params$pch <- NA
-    } else if (differentiation_method == "linetype") {
-      legend_params$lwd <- 2
-      legend_params$lty <- line_types
-      legend_params$pch <- NA
-    } else if (differentiation_method == "pointshape") {
-      legend_params$pch <- point_shapes
-      legend_params$pt.cex <- legend_point_cex
-      legend_params$pt.lwd <- 1.5
-      legend_params$lwd <- 0
-      legend_params$lty <- 0
-      legend_params$seg.len <- 0
-    } else { # combined
-      legend_params$lwd <- 2
-      legend_params$lty <- line_types
-      legend_params$pch <- point_shapes
-      legend_params$pt.cex <- legend_point_cex
-      legend_params$pt.lwd <- 1.5
-    }
-    
-    do.call(graphics::legend, legend_params)
-  }
-  
-  if (plot_saved) {
+    ggplot2::ggsave(filename, plot = p, width = plot_width, height = plot_height, dpi = plot_dpi)
     message("Plot successfully saved as: ", normalizePath(filename))
   }
   
-  # Return metadata
-  invisible(list(
-    compound_names = compound_names_clean,
+  # Return plot and metadata
+  metadata <- list(
+    compound_names = unique(all_curve_data$compound),
     compound_indices = compound_indices,
     n_compounds = n_compounds,
-    plot_limits = list(x_limits = x_limits, y_limits = y_limits),
-    differentiation_method = differentiation_method,
-    styling = list(colors = colors, line_types = line_types, point_shapes = point_shapes),
-    error_bars = list(
-      enabled = show_error_bars,
-      width = error_bar_width,
-      line_width = error_bar_lwd
-    ),
+    point_shapes = point_shapes[1:n_compounds],
+    colors = use_colors,
+    point_size = point_size,
     legend_position = legend_position,
-    legend_settings = list(
-      cex = legend_cex,
-      area_ratio = legend_area_ratio,
-      point_cex = legend_point_cex
-    ),
-    plot_title = plot_title,
-    file_saved = if (plot_saved) filename else NULL,
-    file_format = if (plot_saved) tools::file_ext(filename) else NULL,
+    legend_ncol = ncol_final,
+    legend_text_size = legend_text_size,
+    legend_key_height = legend_key_height,
+    legend_title = legend_title_final,
+    x_limits = x_limits,
     plot_dimensions = c(width = plot_width, height = plot_height, dpi = plot_dpi),
-    timestamp = Sys.time()
-  ))
+    file_saved = if (!is.null(save_plot)) filename else NULL
+  )
+  
+  attr(p, "metadata") <- metadata
+  return(p)
 }

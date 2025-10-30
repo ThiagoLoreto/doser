@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_dose_response.R
 \name{plot_dose_response}
 \alias{plot_dose_response}
-\title{Plot Dose-Response Curves with Professional Styling}
+\title{Plot Dose-Response Curves with ggplot2}
 \usage{
 plot_dose_response(
   results,
@@ -21,12 +21,13 @@ plot_dose_response(
   plot_width = 10,
   plot_height = 8,
   plot_dpi = 600,
-  axis_label_cex = 1.4,
-  axis_number_cex = 1.4,
+  axis_label_size = 14,
+  axis_text_size = 14,
   x_axis_title = NULL,
   y_axis_title = NULL,
   enforce_bottom_threshold = NULL,
-  bottom_threshold = 60
+  bottom_threshold = 60,
+  verbose = FALSE
 )
 }
 \arguments{
@@ -64,17 +65,23 @@ dose-response analysis results.}
 
 \item{plot_dpi}{Resolution for saved raster images (default: 600).}
 
-\item{axis_label_cex}{Character expansion factor for axis labels (default: 1.4).}
+\item{axis_label_size}{Font size for axis labels (default: 14).}
 
-\item{axis_number_cex}{Character expansion factor for axis numbers (default: 1.4).}
+\item{axis_text_size}{Font size for axis numbers (default: 14).}
 
-\item{x_axis_title}{Custom x-axis title. If NULL, uses default expression .}
+\item{x_axis_title}{Custom x-axis title. If NULL, uses default expression.}
 
-\item{y_axis_title}{Custom y-axis title. If NULL, uses default based on
-normalization status}
+\item{y_axis_title}{Custom y-axis title. If NULL, uses default based on normalization.}
+
+\item{enforce_bottom_threshold}{Logical indicating whether bottom threshold enforcement
+was used in analysis (default: NULL, auto-detected from results).}
+
+\item{bottom_threshold}{Numeric value for bottom threshold (default: 60).}
+
+\item{verbose}{Logical indicating whether to show verbose messages (default: FALSE).}
 }
 \value{
-Invisibly returns a list containing plot metadata:
+Returns a ggplot object with comprehensive metadata stored as attributes:
 \itemize{
 \item \code{compound_name}: Name of the plotted compound
 \item \code{compound_index}: Index of the plotted compound
@@ -87,24 +94,39 @@ Invisibly returns a list containing plot metadata:
 \item \code{file_saved}: Path to saved file if plot was saved
 \item \code{plot_dimensions}: Dimensions of the plot (width, height, dpi)
 \item \code{timestamp}: Time when plot was generated
+\item \code{ic50_excluded}: Whether IC50 was excluded due to threshold
+\item \code{log_ic50}: Log IC50 value if available
 }
 }
 \description{
-Generates publication-quality dose-response plots from analysis results.
-Supports error bars, fitted curves, IC50 lines, and multiple export formats.
+Generates publication-quality dose-response plots using ggplot2 from analysis results.
+Features professional styling, error bars, fitted curves, IC50 visualization, and
+multiple export formats. Optimized for scientific publications.
 }
 \details{
-This function creates professional-quality dose-response plots suitable for
-publications and presentations. Key features include:
+This function creates professional-quality dose-response plots using ggplot2,
+providing superior visual quality and customization compared to base R graphics.
+The function automatically handles data validation, curve fitting visualization,
+and professional styling suitable for scientific publications.
+
+\strong{Key Features:}
+\itemize{
+\item \textbf{Professional Styling}: Clean, publication-ready appearance with bold axis labels
+\item \textbf{Smart IC50 Handling}: Only shows IC50 line when valid value exists
+\item \textbf{Error Bar Management}: Automatic handling of replicate data
+\item \textbf{Threshold Awareness}: Detects and handles IC50 exclusion due to bottom thresholds
+\item \textbf{Self-Contained}: No external package loading required
+\item \textbf{Comprehensive Metadata}: Detailed information about the plot and data
+}
 
 \strong{Plot Elements:}
 \itemize{
-\item Data points with error bars (standard deviation)
+\item Data points with optional error bars (standard deviation)
 \item Fitted dose-response curve (when model converged)
-\item Vertical IC50 line with dashed style
-\item Parameter legend with IC50 and R2 values
-\item Professional axis labels and formatting
-\item Optional background grid
+\item Vertical IC50 line (only when valid IC50 exists)
+\item Left-aligned parameter legend with IC50 and R² values
+\item Professional axis formatting with customizable titles
+\item Optional background grid for better readability
 }
 
 \strong{Supported Export Formats:}
@@ -118,24 +140,26 @@ publications and presentations. Key features include:
 }
 \section{Plot Customization}{
 
-The function provides extensive customization options:
+The function provides extensive customization options while maintaining professional quality:
 \itemize{
-\item \strong{Colors}: Customize points, lines, and IC50 marker
-\item \strong{Sizes}: Adjust point sizes, line widths, and error bars
-\item \strong{Axes}: Control limits, labels, and text sizes
-\item \strong{Elements}: Toggle legend, grid, and IC50 line
-\item \strong{Export}: Multiple formats with quality control
+\item \strong{Visual Elements}: Customize colors, sizes, and styling of all plot components
+\item \strong{Layout Control}: Adjust dimensions, resolution, and aspect ratio
+\item \strong{Content Toggle}: Show/hide legend, grid, IC50 line, and error bars
+\item \strong{Text Formatting}: Control font sizes and axis labels
+\item \strong{Export Quality}: Multiple formats with quality and resolution control
 }
 }
 
 \section{Automatic Features}{
 
 \itemize{
+\item Automatic input validation and error handling
+\item Smart detection of threshold-based IC50 exclusion
 \item Automatic directory creation for saved plots
-\item Smart error bar handling (only shown when meaningful)
-\item Graceful handling of failed model fits
-\item Professional axis formatting and labeling
-\item Compound name extraction and display
+\item Intelligent error bar display (only when meaningful data exists)
+\item Graceful handling of failed model fits with clear indication
+\item Professional axis formatting with appropriate scientific notation
+\item Compound name extraction and clean display
 }
 }
 
@@ -145,10 +169,11 @@ The function provides extensive customization options:
 analysis_results <- fit_dose_response(my_data, normalize = TRUE)
 
 # Basic plot for first compound
-plot_dose_response(analysis_results)
+p <- plot_dose_response(analysis_results)
+print(p)
 
 # Customized plot with specific styling
-plot_dose_response(
+p <- plot_dose_response(
   results = analysis_results,
   compound_index = 2,
   point_color = "blue",
@@ -156,16 +181,17 @@ plot_dose_response(
   show_grid = TRUE,
   y_limits = c(0, 200)
 )
+print(p)
 
 # Save plot automatically with compound name
-plot_dose_response(
+p <- plot_dose_response(
   results = analysis_results,
   compound_index = 1,
   save_plot = TRUE  # Saves as "dose_response_CompoundName.png"
 )
 
 # Save plot to specific file with custom dimensions
-plot_dose_response(
+p <- plot_dose_response(
   results = analysis_results,
   save_plot = "my_plot.pdf",
   plot_width = 8,
@@ -173,21 +199,24 @@ plot_dose_response(
 )
 
 # Access plot metadata
-plot_info <- plot_dose_response(analysis_results, compound_index = 3)
-print(plot_info$compound_name)
-print(plot_info$data_points)
+p <- plot_dose_response(analysis_results, compound_index = 3)
+meta <- attr(p, "metadata")
+print(meta$compound_name)
+print(meta$data_points)
+print(meta$log_ic50)
 }
 
 }
 \references{
-For visualization best practices:
+For visualization best practices in scientific publications:
 \itemize{
 \item Nature Scientific Figures Guidelines
+\item ggplot2: Elegant Graphics for Data Analysis (Springer)
 \item R Graphics Cookbook (O'Reilly)
 }
 }
 \seealso{
 \code{\link{fit_dose_response}} for generating analysis results
-\code{\link[graphics]{plot}} for base plotting functions
-\code{\link[grDevices]{png}} for plot export options
+\code{\link[ggplot2]{ggplot}} for underlying plotting functionality
+\code{\link[ggplot2]{ggsave}} for plot export functionality
 }

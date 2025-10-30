@@ -1,7 +1,9 @@
-#' Plot Dose-Response Curves with Professional Styling
+#' Plot Dose-Response Curves with ggplot2
 #'
-#' Generates publication-quality dose-response plots from analysis results.
-#' Supports error bars, fitted curves, IC50 lines, and multiple export formats.
+#' Generates publication-quality dose-response plots using ggplot2 from analysis results.
+#' Features professional styling, error bars, fitted curves, IC50 visualization, and 
+#' multiple export formats. Optimized for scientific publications.
+#'
 #' @param results List object returned by \code{\link{fit_dose_response}} containing
 #'   dose-response analysis results.
 #' @param compound_index Numeric index specifying which compound to plot (default: 1).
@@ -20,13 +22,16 @@
 #' @param plot_width Plot width in inches for saved plots (default: 10).
 #' @param plot_height Plot height in inches for saved plots (default: 8).
 #' @param plot_dpi Resolution for saved raster images (default: 600).
-#' @param axis_label_cex Character expansion factor for axis labels (default: 1.4).
-#' @param axis_number_cex Character expansion factor for axis numbers (default: 1.4).
-#' @param x_axis_title Custom x-axis title. If NULL, uses default expression .
-#' @param y_axis_title Custom y-axis title. If NULL, uses default based on 
-#'   normalization status
+#' @param axis_label_size Font size for axis labels (default: 14).
+#' @param axis_text_size Font size for axis numbers (default: 14).
+#' @param x_axis_title Custom x-axis title. If NULL, uses default expression.
+#' @param y_axis_title Custom y-axis title. If NULL, uses default based on normalization.
+#' @param enforce_bottom_threshold Logical indicating whether bottom threshold enforcement
+#'   was used in analysis (default: NULL, auto-detected from results).
+#' @param bottom_threshold Numeric value for bottom threshold (default: 60).
+#' @param verbose Logical indicating whether to show verbose messages (default: FALSE).
 #'
-#' @return Invisibly returns a list containing plot metadata:
+#' @return Returns a ggplot object with comprehensive metadata stored as attributes:
 #' \itemize{
 #'   \item \code{compound_name}: Name of the plotted compound
 #'   \item \code{compound_index}: Index of the plotted compound
@@ -39,20 +44,34 @@
 #'   \item \code{file_saved}: Path to saved file if plot was saved
 #'   \item \code{plot_dimensions}: Dimensions of the plot (width, height, dpi)
 #'   \item \code{timestamp}: Time when plot was generated
+#'   \item \code{ic50_excluded}: Whether IC50 was excluded due to threshold
+#'   \item \code{log_ic50}: Log IC50 value if available
 #' }
 #'
 #' @details
-#' This function creates professional-quality dose-response plots suitable for
-#' publications and presentations. Key features include:
+#' This function creates professional-quality dose-response plots using ggplot2,
+#' providing superior visual quality and customization compared to base R graphics.
+#' The function automatically handles data validation, curve fitting visualization,
+#' and professional styling suitable for scientific publications.
+#'
+#' \strong{Key Features:}
+#' \itemize{
+#'   \item \textbf{Professional Styling}: Clean, publication-ready appearance with bold axis labels
+#'   \item \textbf{Smart IC50 Handling}: Only shows IC50 line when valid value exists
+#'   \item \textbf{Error Bar Management}: Automatic handling of replicate data
+#'   \item \textbf{Threshold Awareness}: Detects and handles IC50 exclusion due to bottom thresholds
+#'   \item \textbf{Self-Contained}: No external package loading required
+#'   \item \textbf{Comprehensive Metadata}: Detailed information about the plot and data
+#' }
 #'
 #' \strong{Plot Elements:}
 #' \itemize{
-#'   \item Data points with error bars (standard deviation)
+#'   \item Data points with optional error bars (standard deviation)
 #'   \item Fitted dose-response curve (when model converged)
-#'   \item Vertical IC50 line with dashed style
-#'   \item Parameter legend with IC50 and R2 values
-#'   \item Professional axis labels and formatting
-#'   \item Optional background grid
+#'   \item Vertical IC50 line (only when valid IC50 exists)
+#'   \item Left-aligned parameter legend with IC50 and R² values
+#'   \item Professional axis formatting with customizable titles
+#'   \item Optional background grid for better readability
 #' }
 #'
 #' \strong{Supported Export Formats:}
@@ -70,10 +89,11 @@
 #' analysis_results <- fit_dose_response(my_data, normalize = TRUE)
 #'
 #' # Basic plot for first compound
-#' plot_dose_response(analysis_results)
+#' p <- plot_dose_response(analysis_results)
+#' print(p)
 #'
 #' # Customized plot with specific styling
-#' plot_dose_response(
+#' p <- plot_dose_response(
 #'   results = analysis_results,
 #'   compound_index = 2,
 #'   point_color = "blue",
@@ -81,16 +101,17 @@
 #'   show_grid = TRUE,
 #'   y_limits = c(0, 200)
 #' )
+#' print(p)
 #'
 #' # Save plot automatically with compound name
-#' plot_dose_response(
+#' p <- plot_dose_response(
 #'   results = analysis_results,
 #'   compound_index = 1,
 #'   save_plot = TRUE  # Saves as "dose_response_CompoundName.png"
 #' )
 #'
 #' # Save plot to specific file with custom dimensions
-#' plot_dose_response(
+#' p <- plot_dose_response(
 #'   results = analysis_results,
 #'   save_plot = "my_plot.pdf",
 #'   plot_width = 8,
@@ -98,44 +119,48 @@
 #' )
 #'
 #' # Access plot metadata
-#' plot_info <- plot_dose_response(analysis_results, compound_index = 3)
-#' print(plot_info$compound_name)
-#' print(plot_info$data_points)
+#' p <- plot_dose_response(analysis_results, compound_index = 3)
+#' meta <- attr(p, "metadata")
+#' print(meta$compound_name)
+#' print(meta$data_points)
+#' print(meta$log_ic50)
 #' }
 #'
 #' @section Plot Customization:
-#' The function provides extensive customization options:
+#' The function provides extensive customization options while maintaining professional quality:
 #' \itemize{
-#'   \item \strong{Colors}: Customize points, lines, and IC50 marker
-#'   \item \strong{Sizes}: Adjust point sizes, line widths, and error bars
-#'   \item \strong{Axes}: Control limits, labels, and text sizes
-#'   \item \strong{Elements}: Toggle legend, grid, and IC50 line
-#'   \item \strong{Export}: Multiple formats with quality control
+#'   \item \strong{Visual Elements}: Customize colors, sizes, and styling of all plot components
+#'   \item \strong{Layout Control}: Adjust dimensions, resolution, and aspect ratio
+#'   \item \strong{Content Toggle}: Show/hide legend, grid, IC50 line, and error bars
+#'   \item \strong{Text Formatting}: Control font sizes and axis labels
+#'   \item \strong{Export Quality}: Multiple formats with quality and resolution control
 #' }
 #'
 #' @section Automatic Features:
 #' \itemize{
+#'   \item Automatic input validation and error handling
+#'   \item Smart detection of threshold-based IC50 exclusion
 #'   \item Automatic directory creation for saved plots
-#'   \item Smart error bar handling (only shown when meaningful)
-#'   \item Graceful handling of failed model fits
-#'   \item Professional axis formatting and labeling
-#'   \item Compound name extraction and display
+#'   \item Intelligent error bar display (only when meaningful data exists)
+#'   \item Graceful handling of failed model fits with clear indication
+#'   \item Professional axis formatting with appropriate scientific notation
+#'   \item Compound name extraction and clean display
 #' }
 #'
 #' @seealso
 #' \code{\link{fit_dose_response}} for generating analysis results
-#' \code{\link[graphics]{plot}} for base plotting functions
-#' \code{\link[grDevices]{png}} for plot export options
+#' \code{\link[ggplot2]{ggplot}} for underlying plotting functionality
+#' \code{\link[ggplot2]{ggsave}} for plot export functionality
 #'
 #' @export
 #'
 #' @references
-#' For visualization best practices:
+#' For visualization best practices in scientific publications:
 #' \itemize{
 #'   \item Nature Scientific Figures Guidelines
+#'   \item ggplot2: Elegant Graphics for Data Analysis (Springer)
 #'   \item R Graphics Cookbook (O'Reilly)
 #' }
-
 
 
 
@@ -147,9 +172,15 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
                                show_ic50_line = TRUE, show_legend = TRUE,
                                show_grid = FALSE, save_plot = NULL, 
                                plot_width = 10, plot_height = 8, plot_dpi = 600,
-                               axis_label_cex = 1.4, axis_number_cex = 1.4,
+                               axis_label_size = 14, axis_text_size = 14,
                                x_axis_title = NULL, y_axis_title = NULL,
-                               enforce_bottom_threshold = NULL, bottom_threshold = 60) {
+                               enforce_bottom_threshold = NULL, bottom_threshold = 60,
+                               verbose = FALSE) {
+  
+  # Check if required packages are installed
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("ggplot2 package is required. Please install it with: install.packages('ggplot2')")
+  }
   
   # Input validation
   validate_inputs <- function(results, compound_index) {
@@ -189,6 +220,14 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     }
   }
   
+  if (is.null(bottom_threshold)) {
+    bottom_threshold <- if (!is.null(results$threshold_settings)) {
+      results$threshold_settings$bottom_threshold
+    } else {
+      60
+    }
+  }
+  
   # Clean and validate data
   clean_data <- stats::na.omit(result$data)
   required_cols <- c("log_inhibitor", "response")
@@ -206,7 +245,6 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
         n_replicates = nrow(sub_df)
       )
     }))
-    
     stats::na.omit(summary_data)
   }
   
@@ -219,7 +257,22 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
   # Extract compound name (remove plate info if present)
   compound_name_display <- strsplit(result$compound, " \\| ")[[1]][1]
   
-  # Setup plot configuration with flexible axis titles
+  # Check if IC50 was excluded due to threshold
+  ic50_excluded <- FALSE
+  if (enforce_bottom_threshold) {
+    comp_name <- strsplit(result$compound, " \\| ")[[1]][1]
+    summary_row <- results$summary_table[results$summary_table$Compound == comp_name, ]
+    
+    if (nrow(summary_row) > 0) {
+      ic50_value <- summary_row$IC50
+      ic50_excluded <- is.na(ic50_value) || 
+        as.character(ic50_value) == "NA" || 
+        as.character(ic50_value) == "<NA>" ||
+        as.character(ic50_value) == ""
+    }
+  }
+  
+  # Setup plot configuration
   setup_plot_config <- function() {
     x_lab <- if (!is.null(x_axis_title)) {
       x_axis_title
@@ -241,145 +294,20 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
       point_size = point_size,
       line_width = line_width,
       error_bar_width = error_bar_width,
-      axis_label_cex = axis_label_cex,
-      axis_number_cex = axis_number_cex
+      axis_label_size = axis_label_size,
+      axis_text_size = axis_text_size
     )
   }
   
   plot_config <- setup_plot_config()
   
-  # File saving setup with multiple format support
-  setup_plot_device <- function() {
-    if (is.null(save_plot)) return(NULL)
-    
-    if (is.character(save_plot)) {
-      filename <- save_plot
-    } else if (is.logical(save_plot) && save_plot) {
-      safe_name <- gsub("[^a-zA-Z0-9._-]", "_", compound_name_display)
-      filename <- paste0("dose_response_", safe_name, ".png")
-    } else {
-      stop("save_plot must be either a file path or TRUE for auto-naming")
-    }
-    
-    # Create directory if needed
-    plot_dir <- dirname(filename)
-    if (plot_dir != "." && !dir.exists(plot_dir)) {
-      dir.create(plot_dir, recursive = TRUE, showWarnings = FALSE)
-    }
-    
-    # Determine file format with fallback to PNG
-    file_ext <- tolower(tools::file_ext(filename))
-    supported_formats <- c("png", "jpg", "jpeg", "tiff", "pdf", "svg")
-    
-    if (!file_ext %in% supported_formats) {
-      warning("Unsupported format '", file_ext, "'. Using PNG instead.")
-      filename <- sub(paste0("\\.", file_ext, "$"), ".png", filename, ignore.case = TRUE)
-      file_ext <- "png"
-    }
-    
-    # Open appropriate graphics device
-    device_func <- switch(file_ext,
-                          png = function() grDevices::png(filename, width = plot_width, height = plot_height, 
-                                                          units = "in", res = plot_dpi, bg = "white"),
-                          jpg =, jpeg = function() grDevices::jpeg(filename, width = plot_width, height = plot_height, 
-                                                                   units = "in", res = plot_dpi, quality = 90, bg = "white"),
-                          tiff = function() grDevices::tiff(filename, width = plot_width, height = plot_height, 
-                                                            units = "in", res = plot_dpi, compression = "lzw", bg = "white"),
-                          pdf = function() grDevices::pdf(filename, width = plot_width, height = plot_height, 
-                                                          bg = "white", pointsize = 12),
-                          svg = function() grDevices::svg(filename, width = plot_width, height = plot_height, 
-                                                          bg = "white")
-    )
-    
-    device_func()
-    return(list(device = grDevices::dev.cur(), filename = filename))
-  }
-  
-  # Setup plot device and auto-close on exit
-  original_dev <- grDevices::dev.cur()
-  plot_device_info <- setup_plot_device()
-  
-  if (!is.null(plot_device_info)) {
-    on.exit({
-      if (grDevices::dev.cur() == plot_device_info$device) {
-        grDevices::dev.off()
-        if (grDevices::dev.cur() == 1 && original_dev > 1) {
-          grDevices::dev.set(original_dev)
-        }
-        cat("Plot saved as:", normalizePath(plot_device_info$filename), "\n")
-      }
-    })
-  }
-  
-  # Core plotting functions
-  create_base_plot <- function(title_suffix = "") {
-    main_title <- paste(compound_name_display, title_suffix)
-    
-    # Professional plot settings
-    old_par <- graphics::par(
-      mar = c(4.5, 5, 3.5, 1.5),  # margins: bottom, left, top, right
-      mgp = c(2.8, 0.8, 0),       # axis title, labels, line
-      las = 1                      # horizontal labels
-    )
-    on.exit(graphics::par(old_par))
-    
-    # Create base scatter plot
-    graphics::plot(summary_data$log_inhibitor, summary_data$mean_response, 
-                   xlab = plot_config$x_lab, 
-                   ylab = plot_config$y_lab, 
-                   main = trimws(main_title),
-                   pch = 21,
-                   bg = plot_config$point_color,
-                   col = "black",
-                   cex = plot_config$point_size,
-                   ylim = y_limits, 
-                   xaxt = "n",
-                   cex.lab = plot_config$axis_label_cex,
-                   cex.axis = plot_config$axis_number_cex,
-                   cex.main = plot_config$axis_label_cex * 1.1,
-                   font.main = 2,
-                   panel.first = if (show_grid) {
-                     graphics::grid(col = "grey90", lty = "solid", lwd = 0.7)
-                   },
-                   bty = "l",
-                   tcl = -0.3)
-    
-    # Custom x-axis with proper formatting
-    x_ticks <- pretty(summary_data$log_inhibitor)
-    graphics::axis(1, at = x_ticks, 
-                   labels = format(x_ticks, digits = 2, nsmall = 1),
-                   cex.axis = plot_config$axis_number_cex)
-  }
-  
-  # Add error bars (SD) for points with valid standard deviation
-  add_error_bars <- function() {
-    valid_mask <- !is.na(summary_data$sd_response) & 
-      is.finite(summary_data$sd_response) & 
-      summary_data$n_replicates > 1 &
-      summary_data$sd_response > 1e-10
-    
-    if (any(valid_mask)) {
-      valid_data <- summary_data[valid_mask, ]
-      graphics::arrows(
-        x0 = valid_data$log_inhibitor,
-        y0 = valid_data$mean_response - valid_data$sd_response,
-        x1 = valid_data$log_inhibitor,
-        y1 = valid_data$mean_response + valid_data$sd_response,
-        angle = 90, 
-        code = 3, 
-        length = plot_config$error_bar_width, 
-        col = plot_config$point_color,
-        lwd = 1.2
-      )
-    }
-  }
-  
-  # Generate smooth fitted curve for plotting - NO EXTRAPOLATION
+  # Generate fitted curve data
   generate_fitted_curve <- function(model) {
+    if (is.null(model)) return(NULL)
+    
     x_range <- range(summary_data$log_inhibitor, na.rm = TRUE)
     if (!all(is.finite(x_range))) return(NULL)
     
-    # Create sequence ONLY within observed data range
     x_seq <- seq(x_range[1], x_range[2], length.out = 300)
     
     predictions <- tryCatch({
@@ -391,67 +319,38 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     }
   }
   
-  add_fitted_curve <- function(model) {
-    curve_data <- generate_fitted_curve(model)
-    if (!is.null(curve_data)) {
-      graphics::lines(curve_data$log_inhibitor, curve_data$response, 
-                      col = plot_config$line_color, 
-                      lwd = plot_config$line_width,
-                      lty = "solid")
-    }
-  }
-  
-  # Add vertical line at IC50 position
-  add_ic50_line <- function(model) {
-    if (!show_ic50_line) return(NULL)
+  # Get IC50 value for vertical line
+  get_ic50_value <- function(model) {
+    if (is.null(model)) return(NA)
     
-    log_ic50 <- tryCatch({
+    tryCatch({
       coefs <- stats::coef(model)
       if ("LogIC50" %in% names(coefs)) coefs["LogIC50"] else NA
     }, error = function(e) NA)
-    
-    if (is.finite(log_ic50)) {
-      graphics::abline(v = log_ic50, lty = 2, col = ic50_line_color, lwd = 1.5)
-    }
-    return(log_ic50)
   }
   
-  # Create legend content with model parameters
+  # Create legend text
   create_legend_content <- function(model = NULL) {
     if (!show_legend) return(NULL)
     
     if (!is.null(model) && isTRUE(result$success)) {
-      # Extract model parameters
-      log_ic50 <- tryCatch(stats::coef(model)["LogIC50"], error = function(e) NA)
+      log_ic50 <- get_ic50_value(model)
       ic50_value <- if (is.finite(log_ic50)) 10^log_ic50 else NA
       r_squared <- round(result$goodness_of_fit$R_squared, 3)
-      
-      # Check if IC50 was excluded due to threshold
-      ic50_excluded <- FALSE
-      if (enforce_bottom_threshold && !is.na(result$parameters$Value[1])) {
-        bottom_value <- result$parameters$Value[1]  # Bottom parameter
-        ic50_excluded <- bottom_value >= bottom_threshold
-      }
       
       legend_text <- c()
       
       if (ic50_excluded) {
-        legend_text <- c(legend_text, "LogIC50 = NA")
+        legend_text <- c(legend_text, "LogIC50 = NA (threshold)")
+        legend_text <- c(legend_text, "IC50 = NA (threshold)")
       } else if (is.finite(log_ic50)) {
         legend_text <- c(legend_text, paste("LogIC50 =", round(log_ic50, 3)))
-      } else {
-        legend_text <- c(legend_text, "LogIC50 = NA")
-      }
-      
-      if (ic50_excluded) {
-        legend_text <- c(legend_text, "IC50 = NA")
-      } else if (is.finite(ic50_value)) {
         legend_text <- c(legend_text, paste("IC50 =", sprintf("%.2e", ic50_value)))
       } else {
+        legend_text <- c(legend_text, "LogIC50 = NA")
         legend_text <- c(legend_text, "IC50 = NA")
       }
       
-      # Always show R²
       legend_text <- c(legend_text, paste("R² =", r_squared))
       
       return(legend_text)
@@ -461,34 +360,142 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     }
   }
   
-  add_legend <- function(legend_content) {
-    if (!is.null(legend_content)) {
-      graphics::legend("bottomright", 
-                       legend = legend_content,
-                       bty = "n",
-                       cex = 0.8 * plot_config$axis_label_cex)
+  # Model status and data preparation
+  model_success <- !is.null(result$model) && isTRUE(result$success)
+  curve_data <- if (model_success) generate_fitted_curve(result$model) else NULL
+  log_ic50 <- if (model_success) get_ic50_value(result$model) else NA
+  legend_content <- create_legend_content(if (model_success) result$model else NULL)
+  
+  # Create base plot with professional styling
+  p <- ggplot2::ggplot() +
+    ggplot2::labs(
+      x = plot_config$x_lab,
+      y = plot_config$y_lab,
+      title = if (model_success) compound_name_display else paste(compound_name_display, "(Model failed)")
+    ) +
+    ggplot2::coord_cartesian(ylim = y_limits) +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(
+      axis.title = ggplot2::element_text(size = axis_label_size, face = "bold", color = "black"),
+      axis.text = ggplot2::element_text(size = axis_text_size, color = "black"),
+      axis.line = ggplot2::element_line(color = "black"),
+      axis.ticks = ggplot2::element_line(color = "black"),
+      plot.title = ggplot2::element_text(size = axis_label_size + 2, face = "bold", hjust = 0.5, color = "black"),
+      legend.position = "none",  # Using custom annotation instead
+      panel.grid.major = ggplot2::element_line(color = ifelse(show_grid, "grey90", "white")),
+      panel.grid.minor = ggplot2::element_line(color = ifelse(show_grid, "grey95", "white")),
+      panel.background = ggplot2::element_rect(fill = "white", color = NA),
+      plot.background = ggplot2::element_rect(fill = "white", color = NA)
+    )
+  
+  # Add experimental data points
+  p <- p +
+    ggplot2::geom_point(
+      data = summary_data,
+      ggplot2::aes(x = log_inhibitor, y = mean_response),
+      color = point_color,
+      size = point_size * 2
+    )
+  
+  # Add error bars for replicates
+  valid_mask <- !is.na(summary_data$sd_response) & 
+    is.finite(summary_data$sd_response) & 
+    summary_data$n_replicates > 1 &
+    summary_data$sd_response > 1e-10
+  
+  if (any(valid_mask)) {
+    valid_data <- summary_data[valid_mask, ]
+    p <- p +
+      ggplot2::geom_errorbar(
+        data = valid_data,
+        ggplot2::aes(
+          x = log_inhibitor,
+          ymin = mean_response - sd_response,
+          ymax = mean_response + sd_response
+        ),
+        width = error_bar_width * 10,
+        color = point_color,
+        linewidth = 0.8
+      )
+  }
+  
+  # Add fitted curve if model was successful
+  if (!is.null(curve_data)) {
+    p <- p +
+      ggplot2::geom_line(
+        data = curve_data,
+        ggplot2::aes(x = log_inhibitor, y = response),
+        color = line_color,
+        linewidth = line_width / 2
+      )
+  }
+  
+  # Add IC50 line only if valid IC50 exists
+  if (show_ic50_line && is.finite(log_ic50) && !ic50_excluded) {
+    p <- p +
+      ggplot2::geom_vline(
+        xintercept = log_ic50,
+        linetype = "dashed",
+        color = ic50_line_color,
+        linewidth = 0.8
+      )
+  }
+  
+  # Add legend as text annotation (left-aligned)
+  if (show_legend && !is.null(legend_content)) {
+    x_range <- range(summary_data$log_inhibitor, na.rm = TRUE)
+    y_range <- y_limits
+    
+    x_pos <- x_range[1] + diff(x_range) * 0.02
+    y_pos <- y_range[1] + diff(y_range) * 0.1
+    
+    for (i in seq_along(legend_content)) {
+      p <- p +
+        ggplot2::annotate(
+          "text",
+          x = x_pos,
+          y = y_pos - diff(y_range) * 0.05 * (i - 1),
+          label = legend_content[i],
+          hjust = 0,  # Left alignment
+          vjust = 0,
+          size = axis_text_size * 0.3,
+          color = "black"
+        )
     }
   }
   
-  # Main plotting logic
-  model_success <- !is.null(result$model) && isTRUE(result$success)
-  
-  if (model_success) {
-    create_base_plot()
-    add_error_bars()
-    add_fitted_curve(result$model)
-    add_ic50_line(result$model)
-    legend_content <- create_legend_content(result$model)
-  } else {
-    create_base_plot("(Model failed)")
-    add_error_bars()
-    legend_content <- create_legend_content()
+  # Save plot if requested
+  if (!is.null(save_plot)) {
+    if (is.character(save_plot)) {
+      filename <- save_plot
+    } else if (is.logical(save_plot) && save_plot) {
+      safe_name <- gsub("[^a-zA-Z0-9._-]", "_", compound_name_display)
+      filename <- paste0("dose_response_", safe_name, ".png")
+    } else {
+      stop("save_plot must be either a file path or TRUE for auto-naming")
+    }
+    
+    plot_dir <- dirname(filename)
+    if (plot_dir != "." && !dir.exists(plot_dir)) {
+      dir.create(plot_dir, recursive = TRUE, showWarnings = FALSE)
+    }
+    
+    ggplot2::ggsave(
+      filename = filename,
+      plot = p,
+      width = plot_width,
+      height = plot_height,
+      dpi = plot_dpi,
+      bg = "white"
+    )
+    
+    if (verbose) {
+      message("Plot saved as: ", normalizePath(filename))
+    }
   }
   
-  add_legend(legend_content)
-  
-  # Return comprehensive metadata
-  invisible(list(
+  # Return plot with comprehensive metadata
+  metadata <- list(
     compound_name = compound_name_display,
     compound_index = compound_index,
     model_success = model_success,
@@ -497,8 +504,13 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     y_limits_used = y_limits,
     data_points = nrow(clean_data),
     concentration_levels = nrow(summary_data),
-    file_saved = if (!is.null(plot_device_info)) plot_device_info$filename else NULL,
+    file_saved = if (!is.null(save_plot)) filename else NULL,
     plot_dimensions = c(width = plot_width, height = plot_height, dpi = plot_dpi),
-    timestamp = Sys.time()
-  ))
+    timestamp = Sys.time(),
+    ic50_excluded = ic50_excluded,
+    log_ic50 = if (model_success) log_ic50 else NA
+  )
+  
+  attr(p, "metadata") <- metadata
+  return(p)
 }

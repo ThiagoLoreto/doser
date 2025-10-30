@@ -2,33 +2,33 @@
 % Please edit documentation in R/plot_multiple_compounds.R
 \name{plot_multiple_compounds}
 \alias{plot_multiple_compounds}
-\title{Plot Multiple Dose-Response Curves in a Single Graph}
+\title{Plot Multiple Dose-Response Curves Using ggplot2}
 \usage{
 plot_multiple_compounds(
   results,
   compound_indices = NULL,
   y_limits = c(0, 150),
-  colors = NULL,
-  line_types = NULL,
   point_shapes = NULL,
-  differentiation_method = "pointshape",
-  legend_position = "outside",
+  colors = NULL,
+  legend_position = "right",
   show_grid = FALSE,
   show_legend = TRUE,
   save_plot = NULL,
   plot_width = 10,
   plot_height = 8,
   plot_dpi = 600,
-  axis_label_cex = 1.4,
-  axis_number_cex = 1.4,
-  auto_combine_threshold = 12,
+  axis_label_size = 14,
+  axis_text_size = 14,
   show_error_bars = TRUE,
-  error_bar_width = 0.03,
-  error_bar_lwd = 1,
+  error_bar_width = 0.05,
   plot_title = "Multiple Dose-Response Curves",
-  legend_cex = 0.8,
-  legend_area_ratio = 0.25,
-  legend_point_cex = 1
+  legend_text_size = NULL,
+  legend_title_size = 11,
+  legend_key_height = NULL,
+  legend_ncol = NULL,
+  legend_label_wrap = 25,
+  plot_ratio = 0.7,
+  legend_title = NULL
 )
 }
 \arguments{
@@ -40,19 +40,14 @@ If NULL, plots all available compounds (default: NULL).}
 
 \item{y_limits}{Numeric vector of length 2 specifying y-axis limits (default: c(0, 150)).}
 
-\item{colors}{Character vector of colors for each compound. If NULL, generates
-appropriate colors automatically (default: NULL).}
+\item{point_shapes}{Numeric vector of point shapes for each compound. If NULL,
+generates optimal shapes automatically based on number of compounds (default: NULL).}
 
-\item{line_types}{Numeric vector of line types for each compound (default: NULL).}
+\item{colors}{Character vector of colors for each compound. If NULL, uses black
+for all compounds (default: NULL). Provide custom colors for colored output.}
 
-\item{point_shapes}{Numeric vector of point shapes for each compound (default: NULL).}
-
-\item{differentiation_method}{Character specifying how to differentiate curves:
-"color", "linetype", "pointshape", or "combined" (default: "pointshape").}
-
-\item{legend_position}{Character specifying legend position: "bottomright", "bottom",
-"bottomleft", "left", "topleft", "top", "topright", "right", or "outside"
-(default: "outside").}
+\item{legend_position}{Character specifying legend position: "right", "left",
+"top", "bottom", or "none" (default: "right").}
 
 \item{show_grid}{Logical indicating whether to show background grid (default: FALSE).}
 
@@ -67,174 +62,153 @@ appropriate colors automatically (default: NULL).}
 
 \item{plot_dpi}{Resolution for saved raster images (default: 600).}
 
-\item{axis_label_cex}{Character expansion factor for axis labels (default: 1.4).}
+\item{axis_label_size}{Font size for axis labels (default: 14).}
 
-\item{axis_number_cex}{Character expansion factor for axis numbers (default: 1.4).}
-
-\item{auto_combine_threshold}{Numeric threshold for automatically switching to
-"combined" differentiation method (default: 12).}
+\item{axis_text_size}{Font size for axis numbers (default: 14).}
 
 \item{show_error_bars}{Logical indicating whether to show error bars (default: TRUE).}
 
-\item{error_bar_width}{Width of error bar ends (default: 0.03).}
-
-\item{error_bar_lwd}{Line width for error bars (default: 1).}
+\item{error_bar_width}{Width of error bar ends (default: 0.05).}
 
 \item{plot_title}{Character string for plot title (default: "Multiple Dose-Response Curves").}
 
-\item{legend_cex}{Character expansion factor for legend text (default: 0.8).}
+\item{legend_text_size}{Font size for legend text. If NULL, automatically adjusts
+based on number of compounds (default: NULL).}
 
-\item{legend_area_ratio}{Numeric ratio of plot area allocated to external legend
-when legend_position = "outside" (default: 0.25).}
+\item{legend_title_size}{Font size for legend title (default: 11).}
 
-\item{legend_point_cex}{Point size multiplier in legend (default: 1.0).}
+\item{legend_key_height}{Height of legend key in points. If NULL, automatically
+adjusts based on number of compounds (default: NULL).}
+
+\item{legend_ncol}{Number of columns in legend. If NULL, automatically determines
+optimal number (default: NULL).}
+
+\item{legend_label_wrap}{Maximum characters per line in legend labels before
+wrapping (default: 25).}
+
+\item{plot_ratio}{Numeric ratio of plot area allocated to main plot vs legend
+area (default: 0.7).}
+
+\item{legend_title}{Character string for legend title. If NULL, no title is shown
+(default: NULL).}
 }
 \value{
-Invisibly returns a list containing comprehensive plot metadata:
+Returns a ggplot object with comprehensive metadata stored as attributes:
 \itemize{
 \item \code{compound_names}: Names of plotted compounds
 \item \code{compound_indices}: Indices of plotted compounds
 \item \code{n_compounds}: Number of compounds plotted
-\item \code{plot_limits}: List with x and y axis limits used
-\item \code{differentiation_method}: Method used for curve differentiation
-\item \code{styling}: List with colors, line types, and point shapes used
-\item \code{error_bars}: Error bar configuration
+\item \code{point_shapes}: Point shapes used for each compound
+\item \code{colors}: Colors used for each compound
+\item \code{point_size}: Point size used in plot
 \item \code{legend_position}: Legend position used
-\item \code{legend_settings}: Legend configuration parameters
-\item \code{plot_title}: Plot title used
-\item \code{file_saved}: Path to saved file if plot was saved
-\item \code{file_format}: Format of saved file
+\item \code{legend_ncol}: Number of columns in legend
+\item \code{legend_text_size}: Legend text size used
+\item \code{legend_key_height}: Legend key height used
+\item \code{legend_title}: Legend title used
+\item \code{x_limits}: X-axis limits used
 \item \code{plot_dimensions}: Dimensions of the plot (width, height, dpi)
-\item \code{timestamp}: Time when plot was generated
+\item \code{file_saved}: Path to saved file if plot was saved
 }
 }
 \description{
-Creates composite plots showing multiple dose-response curves with advanced
-differentiation methods, professional styling, and flexible legend placement.
-Ideal for comparing multiple compounds or conditions in pharmacological studies.
+Creates composite plots showing multiple dose-response curves with professional
+styling, flexible legend placement, and intelligent defaults. Optimized for
+scientific publications with black-and-white or color output options.
 }
 \details{
-This function creates sophisticated multi-curve dose-response plots with
-intelligent automatic styling and professional presentation. It automatically
-handles curve differentiation, legend placement, and output formatting for
-publication-quality figures.
+This function creates professional multi-curve dose-response plots using ggplot2
+with intelligent defaults optimized for scientific publications. The default
+styling uses black lines with different point shapes for optimal differentiation
+in black-and-white publications, while supporting custom colors for presentations.
 
-\strong{Automatic Features:}
+\strong{Key Features:}
 \itemize{
-\item \strong{Smart Differentiation}: Auto-switches to combined methods for many compounds
-\item \strong{Color Management}: Generates distinct color palettes based on compound count
-\item \strong{Limit Calculation}: Automatically determines optimal axis limits from data
-\item \strong{Error Bar Handling}: Only shows error bars when meaningful data exists
-\item \strong{Layout Optimization}: Adjusts plot layout for external legends
+\item \strong{Black-and-white optimized}: Default uses black lines with distinct point shapes
+\item \strong{Smart point selection}: Automatically chooses optimal point shapes based on compound count
+\item \strong{Adaptive sizing}: Point sizes and legend elements adjust based on number of compounds
+\item \strong{Intelligent text wrapping}: Automatically wraps long compound names in legend
+\item \strong{Professional styling}: Clean, publication-ready appearance with customizable elements
+\item \strong{Self-contained}: No external package loading required
 }
 
-\strong{Differentiation Methods:}
+\strong{Automatic Adjustments:}
 \itemize{
-\item \strong{color}: Uses distinct colors (optimal for 2-8 compounds)
-\item \strong{linetype}: Uses line types 1-6 (repeats after 6 compounds)
-\item \strong{pointshape}: Uses point shapes (optimal for 2-15 compounds)
-\item \strong{combined}: Uses colors + line types + point shapes (best for 8+ compounds)
+\item \strong{Point shapes}: Uses most distinguishable shapes first, recycles intelligently
+\item \strong{Point size}: Larger points for few compounds (3.5), smaller for many (2.5)
+\item \strong{Legend text}: Smaller text for many compounds (9pt), larger for few (11pt)
+\item \strong{Legend columns}: Single column for ≤10 compounds, two columns for >10 compounds
+\item \strong{X-axis limits}: Automatically calculated from data with 5\% margin
 }
 }
 \examples{
 \dontrun{
-# Example 1: Publication-ready multi-panel comparison
+# Example 1: Default black-and-white with automatic point shapes
 analysis_results <- fit_dose_response(my_data, normalize = TRUE)
 
-# Create comparison of different compound classes
-control_compounds <- c(1, 2, 3)   # Reference compounds
-test_compounds <- c(4, 5, 6, 7)   # Experimental compounds
-
-# Plot controls
-plot_multiple_compounds(
+# Plot compounds with default settings (black lines, different point shapes)
+p <- plot_multiple_compounds(
   analysis_results,
-  compound_indices = control_compounds,
-  differentiation_method = "color",
-  colors = c("gray40", "gray60", "gray80"),
-  plot_title = "Control Compounds",
-  legend_position = "bottomright"
+  compound_indices = c(1, 3, 5, 7),
+  plot_title = "Selected Compound Comparison"
 )
+print(p)
 
-# Plot test compounds with bright colors
-plot_multiple_compounds(
+# Example 2: Custom colors for presentation
+p <- plot_multiple_compounds(
   analysis_results,
-  compound_indices = test_compounds,
-  differentiation_method = "color",
-  colors = c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3"), # ColorBrewer colors
-  plot_title = "Experimental Compounds",
-  legend_position = "bottomright"
+  compound_indices = 1:4,
+  colors = c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3"), # ColorBrewer palette
+  plot_title = "Colored Dose-Response Curves",
+  legend_title = "Test Compounds"
 )
+print(p)
 
-# Example 2: Black and white publication figure
-plot_multiple_compounds(
+# Example 3: Publication-ready with custom point shapes
+p <- plot_multiple_compounds(
   analysis_results,
   compound_indices = 1:6,
-  differentiation_method = "combined",
-  colors = rep("black", 6),  # All black lines
-  line_types = 1:6,          # Different line types
-  point_shapes = 15:20,      # Different point shapes
-  plot_title = "Dose-Response Curves (Black & White)",
-  save_plot = "bw_figure.tiff",
-  plot_dpi = 1200
+  point_shapes = c(15, 16, 17, 18, 0, 1), # Specific shapes
+  plot_title = "Custom Point Shapes",
+  legend_position = "bottom",
+  legend_ncol = 3
 )
+print(p)
 
-# Example 3: Large dataset with external legend
-plot_multiple_compounds(
+# Example 4: Many compounds with optimized layout
+p <- plot_multiple_compounds(
   analysis_results,
-  compound_indices = 1:20,
-  differentiation_method = "combined",
-  legend_position = "outside",
-  legend_area_ratio = 0.4,    # More space for legend
-  legend_cex = 0.6,           # Smaller legend text
-  plot_title = "High-Throughput Screening Results",
-  plot_width = 14,            # Wider plot for many compounds
-  plot_height = 8
+  compound_indices = 1:15,
+  plot_title = "High-Throughput Screening",
+  legend_text_size = 8,
+  plot_width = 12,
+  save_plot = "screening_results.png"
 )
+print(p)
 
-# Example 4: Custom styling for specific comparisons
-custom_colors <- c(
-  "Compound_A" = "#1B9E77",
-  "Compound_B" = "#D95F02", 
-  "Compound_C" = "#7570B3",
-  "Compound_D" = "#E7298A"
-)
-
-plot_multiple_compounds(
+# Example 5: Access and use plot metadata
+p <- plot_multiple_compounds(
   analysis_results,
-  compound_indices = c(2, 5, 8, 11),
-  colors = custom_colors,
-  line_types = c(1, 2, 1, 2),      # Alternating line types
-  point_shapes = c(16, 17, 15, 18), # Distinct point shapes
-  plot_title = "Selected Compound Comparison",
-  show_error_bars = TRUE
+  compound_indices = c(2, 4, 6)
 )
 
-# Example 5: Access and use detailed metadata
-plot_meta <- plot_multiple_compounds(
-  analysis_results,
-  compound_indices = 1:8,
-  differentiation_method = "combined"
-)
+# Extract metadata for reproducibility
+meta <- attr(p, "metadata")
+cat("Plotted", meta$n_compounds, "compounds\n")
+cat("Point shapes:", meta$point_shapes, "\n")
+cat("X-axis range:", round(meta$x_limits, 2), "\n")
 
-# Create a plot summary report
-cat("Multi-Curve Plot Summary:\n")
-cat("Compounds plotted:", plot_meta$n_compounds, "\n")
-cat("Differentiation method:", plot_meta$differentiation_method, "\n")
-cat("X-axis range:", round(plot_meta$plot_limits$x_limits, 2), "\n")
-cat("Y-axis range:", plot_meta$plot_limits$y_limits, "\n")
-cat("Colors used:", length(unique(plot_meta$styling$colors)), "unique colors\n")
-cat("Generated:", format(plot_meta$timestamp, "\%Y-\%m-\%d \%H:\%M"), "\n")
-
-# Save styling information for reproducibility
-write.csv(
-  data.frame(
-    Compound = plot_meta$compound_names,
-    Color = plot_meta$styling$colors,
-    LineType = plot_meta$styling$line_types,
-    PointShape = plot_meta$styling$point_shapes
-  ),
-  "plot_styling_reference.csv",
-  row.names = FALSE
+# Save styling information
+styling_info <- data.frame(
+  Compound = meta$compound_names,
+  PointShape = meta$point_shapes,
+  Color = meta$colors
 )
+write.csv(styling_info, "plot_styling.csv", row.names = FALSE)
 }
+
+}
+\seealso{
+\code{\link{fit_dose_response}} for generating input data
+\code{\link[ggplot2]{ggplot}} for underlying plotting functionality
 }
