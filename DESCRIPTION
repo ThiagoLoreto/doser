@@ -21,17 +21,17 @@ URL: https://github.com/ThiagoLoreto/doser
 BugReports: https://github.com/ThiagoLoreto/doser/issues
 Depends: R (>= 4.1.0)
 Imports: 
-    dplyr,
+    ggplot2,
     stats,
-    graphics,
     grDevices,
-    utils
+    graphics,
+    utils,
+    dplyr
 Suggests: 
-    openxlsx,
-    testthat (>= 3.0.0),
-    knitr,
-    rmarkdown,
-    covr
+    dplyr,
+    stringr,
+    lmtest,
+    testthat (>= 3.0.0)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3

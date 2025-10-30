@@ -56,12 +56,12 @@
 #'
 #' \strong{Key Features:}
 #' \itemize{
-#'   \item \textbf{Professional Styling}: Clean, publication-ready appearance with bold axis labels
-#'   \item \textbf{Smart IC50 Handling}: Only shows IC50 line when valid value exists
-#'   \item \textbf{Error Bar Management}: Automatic handling of replicate data
-#'   \item \textbf{Threshold Awareness}: Detects and handles IC50 exclusion due to bottom thresholds
-#'   \item \textbf{Self-Contained}: No external package loading required
-#'   \item \textbf{Comprehensive Metadata}: Detailed information about the plot and data
+#'   \item \strong{Professional Styling}: Clean, publication-ready appearance with bold axis labels
+#'   \item \strong{Smart IC50 Handling}: Only shows IC50 line when valid value exists
+#'   \item \strong{Error Bar Management}: Automatic handling of replicate data
+#'   \item \strong{Threshold Awareness}: Detects and handles IC50 exclusion due to bottom thresholds
+#'   \item \strong{Self-Contained}: No external package loading required
+#'   \item \strong{Comprehensive Metadata}: Detailed information about the plot and data
 #' }
 #'
 #' \strong{Plot Elements:}
