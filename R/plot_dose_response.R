@@ -31,6 +31,8 @@
 #' @param bottom_threshold Numeric value for bottom threshold (default: 60).
 #' @param verbose Logical indicating whether to show verbose messages (default: FALSE).
 #'
+#' @importFrom ggplot2 aes
+#'
 #' @return Returns a ggplot object with comprehensive metadata stored as attributes:
 #' \itemize{
 #'   \item \code{compound_name}: Name of the plotted compound
