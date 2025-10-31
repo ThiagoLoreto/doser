@@ -33,12 +33,12 @@ summary statistics. Default is TRUE}
 for curves where the Bottom parameter exceeds a threshold. Default is FALSE.}
 
 \item{bottom_threshold}{Numeric value specifying the Bottom threshold when
-\code{enforce_bottom_threshold = TRUE}. Curves with Bottom ? this value will have
+\code{enforce_bottom_threshold = TRUE}. Curves with Bottom <= this value will have
 IC50 values set to NA. Default is 60.}
 
-\item{r_squared_threshold}{Numeric value between 0 and 1 specifying the R² cutoff
-for curve quality assessment. Curves with R² below this value will be flagged
-as "Low R²" in the quality assessment (default: 0.8).}
+\item{r_squared_threshold}{Numeric value between 0 and 1 specifying the R2 cutoff
+for curve quality assessment. Curves with R2 below this value will be flagged
+as "Low R2" in the quality assessment (default: 0.8).}
 }
 \value{
 A list containing the following components:

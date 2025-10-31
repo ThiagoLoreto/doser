@@ -124,7 +124,7 @@ and professional styling suitable for scientific publications.
 \item Data points with optional error bars (standard deviation)
 \item Fitted dose-response curve (when model converged)
 \item Vertical IC50 line (only when valid IC50 exists)
-\item Left-aligned parameter legend with IC50 and R² values
+\item Left-aligned parameter legend with IC50 and R2 values
 \item Professional axis formatting with customizable titles
 \item Optional background grid for better readability
 }

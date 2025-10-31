@@ -137,7 +137,7 @@ in black-and-white publications, while supporting custom colors for presentation
 \item \strong{Point shapes}: Uses most distinguishable shapes first, recycles intelligently
 \item \strong{Point size}: Larger points for few compounds (3.5), smaller for many (2.5)
 \item \strong{Legend text}: Smaller text for many compounds (9pt), larger for few (11pt)
-\item \strong{Legend columns}: Single column for ≤10 compounds, two columns for >10 compounds
+\item \strong{Legend columns}: Single column for <=10 compounds, two columns for >10 compounds
 \item \strong{X-axis limits}: Automatically calculated from data with 5\% margin
 }
 }

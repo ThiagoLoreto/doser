@@ -69,7 +69,7 @@
 #'   \item Data points with optional error bars (standard deviation)
 #'   \item Fitted dose-response curve (when model converged)
 #'   \item Vertical IC50 line (only when valid IC50 exists)
-#'   \item Left-aligned parameter legend with IC50 and R² values
+#'   \item Left-aligned parameter legend with IC50 and R2 values
 #'   \item Professional axis formatting with customizable titles
 #'   \item Optional background grid for better readability
 #' }
@@ -235,7 +235,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     stop("No valid data points available or missing required columns")
   }
   
-  # Calculate summary statistics (mean ± SD per concentration)
+  # Calculate summary statistics (mean ? SD per concentration)
   calculate_summary_stats <- function(data) {
     summary_data <- do.call(rbind, lapply(split(data, data$log_inhibitor), function(sub_df) {
       data.frame(
@@ -351,7 +351,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
         legend_text <- c(legend_text, "IC50 = NA")
       }
       
-      legend_text <- c(legend_text, paste("R² =", r_squared))
+      legend_text <- c(legend_text, paste("R2 =", r_squared))
       
       return(legend_text)
       

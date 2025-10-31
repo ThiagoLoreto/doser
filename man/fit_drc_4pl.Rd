@@ -95,7 +95,7 @@ log_inhibitor | Compound1_rep1 | Compound1_rep2 | Compound2_rep1 | Compound2_rep
 
 Curves are classified based on:
 \itemize{
-\item R-squared < threshold: "Low R²"
+\item R-squared < threshold: "Low R2"
 \item Maximum slope < 5: "Very shallow slope"
 \item Maximum slope < 15: "Shallow slope"
 \item Span < 20: "Small span"

@@ -90,7 +90,7 @@
 #' @section Decimal Formatting:
 #' When \code{decimal_comma = TRUE}:
 #' \itemize{
-#'   \item Converts decimal points to commas (e.g., 1.234 → 1,234)
+#'   \item Converts decimal points to commas (e.g., 1.234 -> 1,234)
 #'   \item Suitable for European and many international formats
 #'   \item Only affects Excel export, not the returned data frame
 #' }
