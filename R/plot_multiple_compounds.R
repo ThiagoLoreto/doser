@@ -1,64 +1,56 @@
-#' Plot Multiple Dose-Response Curves Using ggplot2
+#' Plot Multiple Dose-Response Curves
 #'
-#' Creates composite plots showing multiple dose-response curves with professional
-#' styling, flexible legend placement, and intelligent defaults. Optimized for
-#' scientific publications with black-and-white or color output options.
+#' Generates a composite plot of multiple dose-response curves with customizable
+#' appearance and intelligent title generation. The function automatically
+#' determines optimal plot settings based on the number of compounds and
+#' generates intelligent titles when compounds share the same target or compound name.
 #'
-#' @param results List object returned by \code{\link{fit_dose_response}} containing
-#'   dose-response analysis results.
-#' @param compound_indices Numeric vector specifying which compounds to plot.
-#'   If NULL, plots all available compounds (default: NULL).
-#' @param y_limits Numeric vector of length 2 specifying y-axis limits (default: c(0, 150)).
-#' @param point_shapes Numeric vector of point shapes for each compound. If NULL,
-#'   generates optimal shapes automatically based on number of compounds (default: NULL).
-#' @param colors Character vector of colors for each compound. If NULL, uses black
-#'   for all compounds (default: NULL). Provide custom colors for colored output.
-#' @param legend_position Character specifying legend position: "right", "left",
-#'   "top", "bottom", or "none" (default: "right").
-#' @param show_grid Logical indicating whether to show background grid (default: FALSE).
-#' @param show_legend Logical indicating whether to show legend (default: TRUE).
-#' @param save_plot Either a file path for saving the plot, or TRUE for automatic naming
-#'   (default: NULL, no saving).
-#' @param plot_width Plot width in inches for saved plots (default: 10).
-#' @param plot_height Plot height in inches for saved plots (default: 8).
-#' @param plot_dpi Resolution for saved raster images (default: 600).
-#' @param axis_label_size Font size for axis labels (default: 14).
-#' @param axis_text_size Font size for axis numbers (default: 14).
-#' @param show_error_bars Logical indicating whether to show error bars (default: TRUE).
-#' @param error_bar_width Width of error bar ends (default: 0.05).
-#' @param plot_title Character string for plot title (default: "Multiple Dose-Response Curves").
-#' @param legend_text_size Font size for legend text. If NULL, automatically adjusts
-#'   based on number of compounds (default: NULL).
-#' @param legend_title_size Font size for legend title (default: 11).
-#' @param legend_key_height Height of legend key in points. If NULL, automatically
-#'   adjusts based on number of compounds (default: NULL).
-#' @param legend_ncol Number of columns in legend. If NULL, automatically determines
-#'   optimal number (default: NULL).
-#' @param legend_label_wrap Maximum characters per line in legend labels before
-#'   wrapping (default: 25).
-#' @param plot_ratio Numeric ratio of plot area allocated to main plot vs legend
-#'   area (default: 0.7).
-#' @param legend_title Character string for legend title. If NULL, no title is shown
-#'   (default: NULL).
+#' @param results List containing dose-response analysis results with detailed_results
+#'               component containing individual compound fits
+#' @param compound_indices Numeric vector specifying which compounds to include in the plot
+#' @param y_limits Numeric vector of length 2 specifying the y-axis limits
+#' @param point_shapes Numeric vector of point shapes for different compounds
+#' @param colors Character vector of colors for different compound curves
+#' @param legend_position Character specifying legend position
+#' @param show_grid Logical indicating whether to show background grid lines
+#' @param show_legend Logical indicating whether to display the legend
+#' @param save_plot Character string with filename to save plot or logical to auto-generate filename
+#' @param plot_width Numeric value for plot width in inches
+#' @param plot_height Numeric value for plot height in inches
+#' @param plot_dpi Numeric value for plot resolution in dots per inch
+#' @param axis_label_size Numeric value for axis title font size
+#' @param axis_text_size Numeric value for axis tick label font size
+#' @param show_error_bars Logical indicating whether to display error bars around data points
+#' @param error_bar_width Numeric value controlling the width of error bars
+#' @param plot_title Character string for plot title (NULL for automatic title generation)
+#' @param legend_text_size Numeric value for legend text font size
+#' @param legend_title_size Numeric value for legend title font size
+#' @param legend_key_height Numeric value for height of legend keys
+#' @param legend_ncol Numeric value specifying number of columns in legend
+#' @param legend_label_wrap Numeric value specifying maximum characters per line in legend labels
+#' @param plot_ratio Numeric value for plot aspect ratio (width/height)
+#' @param legend_title Character string for legend title
+#' @param legend_labels Character vector of custom labels for legend (overrides compound names)
 #'
 #'@importFrom ggplot2 aes
 #'
-#' @return Returns a ggplot object with comprehensive metadata stored as attributes:
-#' \itemize{
-#'   \item \code{compound_names}: Names of plotted compounds
-#'   \item \code{compound_indices}: Indices of plotted compounds
-#'   \item \code{n_compounds}: Number of compounds plotted
-#'   \item \code{point_shapes}: Point shapes used for each compound
-#'   \item \code{colors}: Colors used for each compound
-#'   \item \code{point_size}: Point size used in plot
-#'   \item \code{legend_position}: Legend position used
-#'   \item \code{legend_ncol}: Number of columns in legend
-#'   \item \code{legend_text_size}: Legend text size used
-#'   \item \code{legend_key_height}: Legend key height used
-#'   \item \code{legend_title}: Legend title used
-#'   \item \code{x_limits}: X-axis limits used
-#'   \item \code{plot_dimensions}: Dimensions of the plot (width, height, dpi)
-#'   \item \code{file_saved}: Path to saved file if plot was saved
+#' @return ggplot object with additional metadata stored as attribute containing:
+#'   - compound_names: Original compound names
+#'   - compound_indices: Indices used for plotting
+#'   - n_compounds: Number of valid compounds plotted
+#'   - point_shapes: Point shapes used
+#'   - colors: Colors used
+#'   - legend_position: Legend position
+#'   - legend_ncol: Number of legend columns
+#'   - legend_text_size: Legend text size
+#'   - legend_key_height: Legend key height
+#'   - legend_title: Legend title used
+#'   - legend_labels_used: Legend labels actually used
+#'   - wrapped_labels: Labels after text wrapping applied
+#'   - x_limits: X-axis limits used
+#'   - plot_dimensions: Plot dimensions and resolution
+#'   - file_saved: Filename if plot was saved
+#'   - smart_title_used: Title actually displayed on plot
 #' }
 #'
 #' @details
@@ -120,22 +112,13 @@
 #' )
 #' print(p)
 #' 
-#' # Example 4: Many compounds with optimized layout
-#' p <- plot_multiple_compounds(
-#'   analysis_results,
-#'   compound_indices = 1:15,
-#'   plot_title = "High-Throughput Screening",
-#'   legend_text_size = 8,
-#'   plot_width = 12,
-#'   save_plot = "screening_results.png"
-#' )
-#' print(p)
+#'
+#'
+#' # Example 4: Custom legend labels and title
+#' plot_multiple_compounds(results,
+#'                        legend_labels = c("Experiment 1", "Experiment 2", "Experiment 3"),
+#'                        plot_title = "My Custom Title")
 #' 
-#' # Example 5: Access and use plot metadata
-#' p <- plot_multiple_compounds(
-#'   analysis_results,
-#'   compound_indices = c(2, 4, 6)
-#' )
 #' 
 #' # Extract metadata for reproducibility
 #' meta <- attr(p, "metadata")
@@ -162,7 +145,6 @@
 
 
 
-
 plot_multiple_compounds <- function(results, compound_indices = NULL, 
                                     y_limits = c(0, 150),
                                     point_shapes = NULL,
@@ -175,16 +157,16 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
                                     axis_text_size = 14,
                                     show_error_bars = TRUE,
                                     error_bar_width = 0.05,
-                                    plot_title = "Multiple Dose-Response Curves",
+                                    plot_title = NULL,
                                     legend_text_size = NULL,
                                     legend_title_size = 11,
                                     legend_key_height = NULL,
                                     legend_ncol = NULL,
                                     legend_label_wrap = 25,
                                     plot_ratio = 0.7,
-                                    legend_title = NULL) {
+                                    legend_title = NULL,
+                                    legend_labels = NULL) {
   
-  # Check if required packages are installed
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     stop("ggplot2 package is required. Please install it with: install.packages('ggplot2')")
   }
@@ -204,7 +186,12 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
     stop("Compound indices exceed available compounds")
   }
   
-  # Validate parameters
+  if (!is.null(legend_labels)) {
+    if (length(legend_labels) != n_compounds) {
+      stop("legend_labels must have the same length as compound_indices (", n_compounds, ")")
+    }
+  }
+  
   if (plot_ratio <= 0 || plot_ratio >= 1) {
     stop("plot_ratio must be between 0 and 1 (exclusive)")
   }
@@ -214,19 +201,20 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
     stop("legend_position must be one of: '", paste(valid_positions, collapse = "', '"), "'")
   }
   
-  # Smart defaults for legend based on number of compounds
+  # Smart defaults for legend
   if (is.null(legend_text_size)) {
-    legend_text_size <- if (n_compounds > 15) 9 else
-      if (n_compounds > 8) 10 else 11
+    legend_text_size <- if (n_compounds > 15) 9 else if (n_compounds > 8) 10 else 11
   }
   
   if (is.null(legend_key_height)) {
     legend_key_height <- if (n_compounds > 15) 12 else 15
   }
   
-  # Extract compound data and prepare for plotting
+  # Extract compound data
   curve_data <- list()
   point_data <- list()
+  compound_names_original <- character(n_compounds)
+  valid_compound_indices <- numeric(0)
   
   for (i in seq_along(compound_indices)) {
     idx <- compound_indices[i]
@@ -238,8 +226,9 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
     }
     
     compound_name <- strsplit(result$compound, " \\| ")[[1]][1]
+    compound_names_original[i] <- compound_name
+    valid_compound_indices <- c(valid_compound_indices, i)
     
-    # Prepare curve data
     data <- result$data
     valid_data <- data[is.finite(data$log_inhibitor) & is.finite(data$response), ]
     
@@ -295,46 +284,109 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
     stop("No valid data to plot")
   }
   
-  # Smart point shape selection
+  n_valid_compounds <- length(valid_compound_indices)
+  
+  # Intelligent title generation
+  generate_smart_title <- function(compound_names) {
+    if (length(compound_names) == 0) {
+      return("Multiple Dose-Response Curves")
+    }
+    
+    extract_parts <- function(full_name) {
+      parts <- strsplit(full_name, ":")[[1]]
+      if (length(parts) == 2) {
+        return(list(target = parts[1], compound = parts[2]))
+      } else {
+        return(list(target = full_name, compound = full_name))
+      }
+    }
+    
+    parts_list <- lapply(compound_names, extract_parts)
+    targets <- sapply(parts_list, function(x) x$target)
+    compounds <- sapply(parts_list, function(x) x$compound)
+    
+    # Remove _2, _3 suffixes for comparison
+    compounds_base <- gsub("_\\d+$", "", compounds)
+    
+    # Check if all have same compound (ignoring suffixes)
+    unique_compounds_base <- unique(compounds_base)
+    if (length(unique_compounds_base) == 1) {
+      return(unique_compounds_base[1])
+    }
+    
+    # Check if all have same target
+    unique_targets <- unique(targets)
+    if (length(unique_targets) == 1) {
+      return(unique_targets[1])
+    }
+    
+    return("Multiple Dose-Response Curves")
+  }
+  
+  # Apply smart title logic
+  if (is.null(plot_title)) {
+    plot_title_final <- generate_smart_title(unique(all_curve_data$compound))
+  } else {
+    plot_title_final <- plot_title
+  }
+  
+  # Point shape selection
   if (is.null(point_shapes)) {
     optimal_shapes <- c(16, 17, 15, 18, 8, 1, 2, 0, 5, 6, 7, 10, 11, 12, 13, 14)
     
-    if (n_compounds <= 6) {
-      point_shapes <- optimal_shapes[1:n_compounds]
+    if (n_valid_compounds <= 6) {
+      point_shapes <- optimal_shapes[1:n_valid_compounds]
     } else {
-      point_shapes <- rep(optimal_shapes, length.out = n_compounds)
+      point_shapes <- rep(optimal_shapes, length.out = n_valid_compounds)
     }
   } else {
-    point_shapes <- rep(point_shapes, length.out = n_compounds)
+    point_shapes <- rep(point_shapes, length.out = n_valid_compounds)
   }
   
-  # Color logic: default is black, but allows custom colors
+  # Color logic
   use_colors <- if (!is.null(colors)) {
-    if (length(colors) < n_compounds) {
-      warning("Number of colors provided (", length(colors), ") is less than number of compounds (", n_compounds, "). Recycling colors.")
-      rep(colors, length.out = n_compounds)
+    if (length(colors) < n_valid_compounds) {
+      warning("Number of colors provided (", length(colors), ") is less than number of valid compounds (", n_valid_compounds, "). Recycling colors.")
+      rep(colors, length.out = n_valid_compounds)
     } else {
-      colors[1:n_compounds]
+      colors[1:n_valid_compounds]
     }
   } else {
-    rep("black", n_compounds)
+    rep("black", n_valid_compounds)
   }
   
-  # Smart text wrapping for long compound names
+  # Legend labels
+  if (!is.null(legend_labels)) {
+    compound_labels <- legend_labels[valid_compound_indices]
+  } else {
+    compound_labels <- unique(all_curve_data$compound)
+  }
+  
+  # Text wrapping for long labels
   smart_label_wrap <- function(labels, width = legend_label_wrap) {
     sapply(labels, function(label) {
-      if (nchar(label) <= width) return(label)
+      if (is.na(label) || nchar(label) <= width) return(label)
       
       # Try to break at hyphens or underscores first
       if (grepl("[-_]", label)) {
         parts <- strsplit(label, "[-_]")[[1]]
-        if (length(parts) > 1 && any(nchar(parts) <= width)) {
-          best_break <- which(cumsum(nchar(parts) + 1) <= width)
-          if (length(best_break) > 0) {
-            break_point <- max(best_break)
-            line1 <- paste(parts[1:break_point], collapse = "-")
-            line2 <- paste(parts[(break_point + 1):length(parts)], collapse = "-")
-            return(paste(line1, line2, sep = "\n"))
+        if (length(parts) > 1) {
+          current_length <- 0
+          break_points <- numeric(0)
+          for (j in seq_along(parts)) {
+            current_length <- current_length + nchar(parts[j]) + 1
+            if (current_length <= width + 1) {
+              break_points <- c(break_points, j)
+            }
+          }
+          
+          if (length(break_points) > 0) {
+            break_point <- max(break_points)
+            if (break_point < length(parts)) {
+              line1 <- paste(parts[1:break_point], collapse = "-")
+              line2 <- paste(parts[(break_point + 1):length(parts)], collapse = "-")
+              return(paste(line1, line2, sep = "\n"))
+            }
           }
         }
       }
@@ -343,47 +395,62 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
       words <- strsplit(label, " ")[[1]]
       if (length(words) > 1) {
         lines <- character(0)
-        current_line <- ""
+        current_line <- words[1]
         
-        for (word in words) {
-          test_line <- if (current_line == "") word else paste(current_line, word)
+        for (j in 2:length(words)) {
+          test_line <- paste(current_line, words[j])
           if (nchar(test_line) <= width) {
             current_line <- test_line
           } else {
-            if (current_line != "") lines <- c(lines, current_line)
-            current_line <- word
+            lines <- c(lines, current_line)
+            current_line <- words[j]
           }
         }
-        if (current_line != "") lines <- c(lines, current_line)
+        lines <- c(lines, current_line)
         
         if (length(lines) <= 3) {
           return(paste(lines, collapse = "\n"))
+        } else {
+          mid <- ceiling(length(words) / 2)
+          line1 <- paste(words[1:mid], collapse = " ")
+          line2 <- paste(words[(mid + 1):length(words)], collapse = " ")
+          return(paste(line1, line2, sep = "\n"))
         }
       }
       
-      # Simple break for very long single words
-      if (nchar(label) > width * 2) {
-        part1 <- substr(label, 1, width)
-        part2 <- substr(label, width + 1, width * 2)
-        part3 <- substr(label, (width * 2) + 1, nchar(label))
-        return(paste(part1, part2, part3, sep = "\n"))
-      } else {
-        mid <- ceiling(nchar(label) / 2)
-        space_pos <- gregexpr(" ", substr(label, mid - 5, mid + 5))[[1]]
-        if (any(space_pos > 0)) {
-          break_point <- mid - 6 + min(space_pos[space_pos > 0])
-        } else {
-          break_point <- mid
-        }
-        return(paste(substr(label, 1, break_point), 
-                     substr(label, break_point + 1, nchar(label)), sep = "\n"))
+      # Force break for very long single words
+      if (nchar(label) > width) {
+        break_point <- ceiling(nchar(label) / 2)
+        part1 <- substr(label, 1, break_point)
+        part2 <- substr(label, break_point + 1, nchar(label))
+        return(paste(part1, part2, sep = "\n"))
       }
-    })
+      
+      return(label)
+    }, USE.NAMES = FALSE)
   }
   
-  # Apply text wrapping
-  compound_labels <- unique(all_curve_data$compound)
   wrapped_labels <- smart_label_wrap(compound_labels, legend_label_wrap)
+  
+  # Factor ordering for consistent legend
+  all_curve_data$compound <- factor(all_curve_data$compound, 
+                                    levels = unique(all_curve_data$compound))
+  
+  # Map custom legend labels if provided
+  if (!is.null(legend_labels)) {
+    name_mapping <- setNames(compound_labels, unique(all_curve_data$compound))
+    
+    all_curve_data$compound_display <- name_mapping[as.character(all_curve_data$compound)]
+    all_point_data$compound_display <- name_mapping[as.character(all_point_data$compound)]
+    
+    all_curve_data$compound_display <- factor(all_curve_data$compound_display, 
+                                              levels = compound_labels)
+    all_point_data$compound_display <- factor(all_point_data$compound_display, 
+                                              levels = compound_labels)
+  } else {
+    all_curve_data$compound_display <- all_curve_data$compound
+    all_point_data$compound_display <- all_point_data$compound
+  }
   
   # Calculate optimal X-axis limits
   calculate_x_limits <- function(curve_data, point_data) {
@@ -399,11 +466,10 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
   
   x_limits <- calculate_x_limits(all_curve_data, all_point_data)
   
-  # Adaptive point size based on number of compounds
-  point_size <- if (n_compounds > 15) 2.5 else 
-    if (n_compounds > 8) 3 else 3.5
+  # Adaptive point size
+  point_size <- if (n_valid_compounds > 15) 2.5 else if (n_valid_compounds > 8) 3 else 3.5
   
-  # Final legend title (NULL = no title)
+  # Final legend title
   legend_title_final <- if (!is.null(legend_title)) legend_title else NULL
   
   # Create base plot
@@ -411,7 +477,7 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
     ggplot2::labs(
       x = expression(paste("Log"[10], " Concentration [M]")),
       y = ifelse(results$normalized, "Normalized BRET ratio [%]", "BRET ratio"),
-      title = plot_title,
+      title = plot_title_final,
       shape = legend_title_final
     ) +
     ggplot2::coord_cartesian(xlim = x_limits, ylim = y_limits) +
@@ -434,15 +500,15 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
       plot.background = ggplot2::element_rect(fill = "white", color = NA)
     )
   
-  # Add plot elements with color control
+  # Add plot elements
   if (!is.null(colors)) {
-    # COLOR MODE: colored lines and points
+    # Color mode
     p <- p +
       ggplot2::geom_line(data = all_curve_data, 
-                         aes(x = log_inhibitor, y = response, group = compound, color = compound),
+                         ggplot2::aes(x = log_inhibitor, y = response, group = compound_display, color = compound_display),
                          linewidth = 1, alpha = 0.7) +
       ggplot2::geom_point(data = all_point_data,
-                          aes(x = log_inhibitor, y = mean_response, shape = compound, color = compound),
+                          ggplot2::aes(x = log_inhibitor, y = mean_response, shape = compound_display, color = compound_display),
                           size = point_size) +
       ggplot2::scale_color_manual(
         values = use_colors,
@@ -450,41 +516,41 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
         guide = "none"
       ) +
       ggplot2::scale_shape_manual(
-        values = point_shapes[1:n_compounds],
+        values = point_shapes[1:n_valid_compounds],
         labels = wrapped_labels
       )
     
     if (show_error_bars && nrow(all_point_data) > 0) {
       p <- p +
         ggplot2::geom_errorbar(data = all_point_data,
-                               aes(x = log_inhibitor, 
-                                   ymin = mean_response - sd_response, 
-                                   ymax = mean_response + sd_response,
-                                   group = compound, color = compound),
+                               ggplot2::aes(x = log_inhibitor, 
+                                            ymin = mean_response - sd_response, 
+                                            ymax = mean_response + sd_response,
+                                            group = compound_display, color = compound_display),
                                width = error_bar_width, 
                                linewidth = 0.5)
     }
   } else {
-    # DEFAULT MODE: all black
+    # Default black mode
     p <- p +
       ggplot2::geom_line(data = all_curve_data, 
-                         aes(x = log_inhibitor, y = response, group = compound),
+                         ggplot2::aes(x = log_inhibitor, y = response, group = compound_display),
                          color = "black", linewidth = 1, alpha = 0.7) +
       ggplot2::geom_point(data = all_point_data,
-                          aes(x = log_inhibitor, y = mean_response, shape = compound),
+                          ggplot2::aes(x = log_inhibitor, y = mean_response, shape = compound_display),
                           color = "black", size = point_size) +
       ggplot2::scale_shape_manual(
-        values = point_shapes[1:n_compounds],
+        values = point_shapes[1:n_valid_compounds],
         labels = wrapped_labels
       )
     
     if (show_error_bars && nrow(all_point_data) > 0) {
       p <- p +
         ggplot2::geom_errorbar(data = all_point_data,
-                               aes(x = log_inhibitor, 
-                                   ymin = mean_response - sd_response, 
-                                   ymax = mean_response + sd_response,
-                                   group = compound),
+                               ggplot2::aes(x = log_inhibitor, 
+                                            ymin = mean_response - sd_response, 
+                                            ymax = mean_response + sd_response,
+                                            group = compound_display),
                                color = "black",
                                width = error_bar_width, 
                                linewidth = 0.5)
@@ -495,7 +561,7 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
   if (!is.null(legend_ncol)) {
     ncol_final <- legend_ncol
   } else {
-    ncol_final <- if (n_compounds > 10) 2 else 1
+    ncol_final <- if (n_valid_compounds > 10) 2 else 1
   }
   
   # Configure legend appearance
@@ -550,8 +616,8 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
   metadata <- list(
     compound_names = unique(all_curve_data$compound),
     compound_indices = compound_indices,
-    n_compounds = n_compounds,
-    point_shapes = point_shapes[1:n_compounds],
+    n_compounds = n_valid_compounds,
+    point_shapes = point_shapes[1:n_valid_compounds],
     colors = use_colors,
     point_size = point_size,
     legend_position = legend_position,
@@ -559,9 +625,12 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
     legend_text_size = legend_text_size,
     legend_key_height = legend_key_height,
     legend_title = legend_title_final,
+    legend_labels_used = compound_labels,
+    wrapped_labels = wrapped_labels,
     x_limits = x_limits,
     plot_dimensions = c(width = plot_width, height = plot_height, dpi = plot_dpi),
-    file_saved = if (!is.null(save_plot)) filename else NULL
+    file_saved = if (!is.null(save_plot)) filename else NULL,
+    smart_title_used = plot_title_final
   )
   
   attr(p, "metadata") <- metadata

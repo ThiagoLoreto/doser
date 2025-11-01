@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_multiple_compounds.R
 \name{plot_multiple_compounds}
 \alias{plot_multiple_compounds}
-\title{Plot Multiple Dose-Response Curves Using ggplot2}
+\title{Plot Multiple Dose-Response Curves}
 \usage{
 plot_multiple_compounds(
   results,
@@ -21,100 +21,96 @@ plot_multiple_compounds(
   axis_text_size = 14,
   show_error_bars = TRUE,
   error_bar_width = 0.05,
-  plot_title = "Multiple Dose-Response Curves",
+  plot_title = NULL,
   legend_text_size = NULL,
   legend_title_size = 11,
   legend_key_height = NULL,
   legend_ncol = NULL,
   legend_label_wrap = 25,
   plot_ratio = 0.7,
-  legend_title = NULL
+  legend_title = NULL,
+  legend_labels = NULL
 )
 }
 \arguments{
-\item{results}{List object returned by \code{\link{fit_dose_response}} containing
-dose-response analysis results.}
+\item{results}{List containing dose-response analysis results with detailed_results
+component containing individual compound fits}
 
-\item{compound_indices}{Numeric vector specifying which compounds to plot.
-If NULL, plots all available compounds (default: NULL).}
+\item{compound_indices}{Numeric vector specifying which compounds to include in the plot}
 
-\item{y_limits}{Numeric vector of length 2 specifying y-axis limits (default: c(0, 150)).}
+\item{y_limits}{Numeric vector of length 2 specifying the y-axis limits}
 
-\item{point_shapes}{Numeric vector of point shapes for each compound. If NULL,
-generates optimal shapes automatically based on number of compounds (default: NULL).}
+\item{point_shapes}{Numeric vector of point shapes for different compounds}
 
-\item{colors}{Character vector of colors for each compound. If NULL, uses black
-for all compounds (default: NULL). Provide custom colors for colored output.}
+\item{colors}{Character vector of colors for different compound curves}
 
-\item{legend_position}{Character specifying legend position: "right", "left",
-"top", "bottom", or "none" (default: "right").}
+\item{legend_position}{Character specifying legend position}
 
-\item{show_grid}{Logical indicating whether to show background grid (default: FALSE).}
+\item{show_grid}{Logical indicating whether to show background grid lines}
 
-\item{show_legend}{Logical indicating whether to show legend (default: TRUE).}
+\item{show_legend}{Logical indicating whether to display the legend}
 
-\item{save_plot}{Either a file path for saving the plot, or TRUE for automatic naming
-(default: NULL, no saving).}
+\item{save_plot}{Character string with filename to save plot or logical to auto-generate filename}
 
-\item{plot_width}{Plot width in inches for saved plots (default: 10).}
+\item{plot_width}{Numeric value for plot width in inches}
 
-\item{plot_height}{Plot height in inches for saved plots (default: 8).}
+\item{plot_height}{Numeric value for plot height in inches}
 
-\item{plot_dpi}{Resolution for saved raster images (default: 600).}
+\item{plot_dpi}{Numeric value for plot resolution in dots per inch}
 
-\item{axis_label_size}{Font size for axis labels (default: 14).}
+\item{axis_label_size}{Numeric value for axis title font size}
 
-\item{axis_text_size}{Font size for axis numbers (default: 14).}
+\item{axis_text_size}{Numeric value for axis tick label font size}
 
-\item{show_error_bars}{Logical indicating whether to show error bars (default: TRUE).}
+\item{show_error_bars}{Logical indicating whether to display error bars around data points}
 
-\item{error_bar_width}{Width of error bar ends (default: 0.05).}
+\item{error_bar_width}{Numeric value controlling the width of error bars}
 
-\item{plot_title}{Character string for plot title (default: "Multiple Dose-Response Curves").}
+\item{plot_title}{Character string for plot title (NULL for automatic title generation)}
 
-\item{legend_text_size}{Font size for legend text. If NULL, automatically adjusts
-based on number of compounds (default: NULL).}
+\item{legend_text_size}{Numeric value for legend text font size}
 
-\item{legend_title_size}{Font size for legend title (default: 11).}
+\item{legend_title_size}{Numeric value for legend title font size}
 
-\item{legend_key_height}{Height of legend key in points. If NULL, automatically
-adjusts based on number of compounds (default: NULL).}
+\item{legend_key_height}{Numeric value for height of legend keys}
 
-\item{legend_ncol}{Number of columns in legend. If NULL, automatically determines
-optimal number (default: NULL).}
+\item{legend_ncol}{Numeric value specifying number of columns in legend}
 
-\item{legend_label_wrap}{Maximum characters per line in legend labels before
-wrapping (default: 25).}
+\item{legend_label_wrap}{Numeric value specifying maximum characters per line in legend labels}
 
-\item{plot_ratio}{Numeric ratio of plot area allocated to main plot vs legend
-area (default: 0.7).}
+\item{plot_ratio}{Numeric value for plot aspect ratio (width/height)}
 
-\item{legend_title}{Character string for legend title. If NULL, no title is shown
-(default: NULL).}
+\item{legend_title}{Character string for legend title}
+
+\item{legend_labels}{Character vector of custom labels for legend (overrides compound names)}
 }
 \value{
-Returns a ggplot object with comprehensive metadata stored as attributes:
+ggplot object with additional metadata stored as attribute containing:
 \itemize{
-\item \code{compound_names}: Names of plotted compounds
-\item \code{compound_indices}: Indices of plotted compounds
-\item \code{n_compounds}: Number of compounds plotted
-\item \code{point_shapes}: Point shapes used for each compound
-\item \code{colors}: Colors used for each compound
-\item \code{point_size}: Point size used in plot
-\item \code{legend_position}: Legend position used
-\item \code{legend_ncol}: Number of columns in legend
-\item \code{legend_text_size}: Legend text size used
-\item \code{legend_key_height}: Legend key height used
-\item \code{legend_title}: Legend title used
-\item \code{x_limits}: X-axis limits used
-\item \code{plot_dimensions}: Dimensions of the plot (width, height, dpi)
-\item \code{file_saved}: Path to saved file if plot was saved
+\item compound_names: Original compound names
+\item compound_indices: Indices used for plotting
+\item n_compounds: Number of valid compounds plotted
+\item point_shapes: Point shapes used
+\item colors: Colors used
+\item legend_position: Legend position
+\item legend_ncol: Number of legend columns
+\item legend_text_size: Legend text size
+\item legend_key_height: Legend key height
+\item legend_title: Legend title used
+\item legend_labels_used: Legend labels actually used
+\item wrapped_labels: Labels after text wrapping applied
+\item x_limits: X-axis limits used
+\item plot_dimensions: Plot dimensions and resolution
+\item file_saved: Filename if plot was saved
+\item smart_title_used: Title actually displayed on plot
+}
 }
 }
 \description{
-Creates composite plots showing multiple dose-response curves with professional
-styling, flexible legend placement, and intelligent defaults. Optimized for
-scientific publications with black-and-white or color output options.
+Generates a composite plot of multiple dose-response curves with customizable
+appearance and intelligent title generation. The function automatically
+determines optimal plot settings based on the number of compounds and
+generates intelligent titles when compounds share the same target or compound name.
 }
 \details{
 This function creates professional multi-curve dose-response plots using ggplot2
@@ -175,22 +171,13 @@ p <- plot_multiple_compounds(
 )
 print(p)
 
-# Example 4: Many compounds with optimized layout
-p <- plot_multiple_compounds(
-  analysis_results,
-  compound_indices = 1:15,
-  plot_title = "High-Throughput Screening",
-  legend_text_size = 8,
-  plot_width = 12,
-  save_plot = "screening_results.png"
-)
-print(p)
 
-# Example 5: Access and use plot metadata
-p <- plot_multiple_compounds(
-  analysis_results,
-  compound_indices = c(2, 4, 6)
-)
+
+# Example 4: Custom legend labels and title
+plot_multiple_compounds(results,
+                       legend_labels = c("Experiment 1", "Experiment 2", "Experiment 3"),
+                       plot_title = "My Custom Title")
+
 
 # Extract metadata for reproducibility
 meta <- attr(p, "metadata")

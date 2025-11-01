@@ -118,9 +118,6 @@
 
 
 
-
-
-
 ratio_dose_response <- function(data, 
                                 control_0perc = NULL, control_100perc = NULL,
                                 split_replicates = TRUE, info_table = NULL,
@@ -190,7 +187,7 @@ ratio_dose_response <- function(data,
       stop("Info table must have at least 4 columns: log(inhibitor), Plate_Row, Target, and Compound")
     }
     
-    base_id_values <- paste(info_table[[3]], info_table[[4]], sep = "-")
+    base_id_values <- paste(info_table[[3]], info_table[[4]], sep = ":")
     info_table$Base_ID <- base_id_values
     
     id_counts <- table(base_id_values)
@@ -220,7 +217,7 @@ ratio_dose_response <- function(data,
       info_table$Target_Modified <- info_table[[3]]
     }
     
-    info_table$ID <- paste(info_table$Target_Modified, info_table[[4]], sep = "-")
+    info_table$ID <- paste(info_table$Target_Modified, info_table[[4]], sep = ":")
   }
   
   # Automatically create row intervals based on Target column

@@ -15,7 +15,7 @@ plot_dose_response(
   line_width = 2,
   error_bar_width = 0.01,
   show_ic50_line = TRUE,
-  show_legend = TRUE,
+  show_legend = FALSE,
   show_grid = FALSE,
   save_plot = NULL,
   plot_width = 10,
@@ -52,7 +52,7 @@ dose-response analysis results.}
 
 \item{show_ic50_line}{Logical indicating whether to show vertical IC50 line (default: TRUE).}
 
-\item{show_legend}{Logical indicating whether to show parameter legend (default: TRUE).}
+\item{show_legend}{Logical indicating whether to show parameter legend (default: FALSE).}
 
 \item{show_grid}{Logical indicating whether to show background grid (default: FALSE).}
 
