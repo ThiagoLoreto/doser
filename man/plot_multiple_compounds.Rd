@@ -105,7 +105,6 @@ ggplot object with additional metadata stored as attribute containing:
 \item smart_title_used: Title actually displayed on plot
 }
 }
-}
 \description{
 Generates a composite plot of multiple dose-response curves with customizable
 appearance and intelligent title generation. The function automatically

@@ -32,7 +32,9 @@
 #' @param legend_title Character string for legend title
 #' @param legend_labels Character vector of custom labels for legend (overrides compound names)
 #'
+#'
 #'@importFrom ggplot2 aes
+#'
 #'
 #' @return ggplot object with additional metadata stored as attribute containing:
 #'   - compound_names: Original compound names
@@ -51,7 +53,6 @@
 #'   - plot_dimensions: Plot dimensions and resolution
 #'   - file_saved: Filename if plot was saved
 #'   - smart_title_used: Title actually displayed on plot
-#' }
 #'
 #' @details
 #' This function creates professional multi-curve dose-response plots using ggplot2
