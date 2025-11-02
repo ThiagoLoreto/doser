@@ -9,7 +9,7 @@ plot_multiple_compounds(
   compound_indices = NULL,
   y_limits = c(0, 150),
   point_shapes = NULL,
-  colors = NULL,
+  colors = FALSE,
   legend_position = "right",
   show_grid = FALSE,
   show_legend = TRUE,

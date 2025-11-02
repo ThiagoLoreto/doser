@@ -269,8 +269,16 @@ ratio_dose_response <- function(data,
         assay_score <- match(assay_level, priority_order)
         z_score <- match(z_level, priority_order)
         
-        min_score <- min(luciferase_score, assay_score, z_score, na.rm = TRUE)
+        scores_to_consider <- c(luciferase_score, assay_score)
+        if (!is.na(z_score) && z_level != "insufficient") {
+          scores_to_consider <- c(scores_to_consider, z_score)
+        }
         
+        if (all(is.na(scores_to_consider))) {
+          return("insufficient")
+        }
+        
+        min_score <- min(scores_to_consider, na.rm = TRUE)
         return(priority_order[min_score])
       }
       

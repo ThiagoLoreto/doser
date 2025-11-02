@@ -130,6 +130,7 @@
 #' @importFrom dplyr %>% mutate across
 #' @export
 
+
 fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = TRUE, 
                         enforce_bottom_threshold = FALSE, bottom_threshold = 60, 
                         r_sqr_threshold = 0.8) {
@@ -278,7 +279,7 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
     
     bottom_limits <- if (curve_type == "activation") c(-100, Inf) else c(-100, 600)
     top_limits <- c(0, 700)
-    logIC50_limits <- c(-10, 2)
+    logIC50_limits <- c(-20, 5)
     
     corrections <- list()
     reasons <- list()
@@ -478,7 +479,7 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
       if (abs(max_slope) < 5) quality_flags <- c(quality_flags, "Very shallow slope")
       else if (abs(max_slope) < 15) quality_flags <- c(quality_flags, "Shallow slope")
       if (abs(span) < 20) quality_flags <- c(quality_flags, "Small span")
-      if (gof_results$R_squared < r_sqr_threshold) quality_flags <- c(quality_flags, "Low R2")
+      if (gof_results$R_squared < r_sqr_threshold) quality_flags <- c(quality_flags, "Low R²")
       if (!is.null(logIC50_ci) && !any(is.na(logIC50_ci))) {
         ci_range <- abs(logIC50_ci[2] - logIC50_ci[1])
         if (ci_range > 0.666) {
@@ -707,29 +708,29 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
     cat("DOSE-RESPONSE ANALYSIS COMPLETED SUCCESSFULLY!\n")
     cat(strrep("=", 50), "\n")
     cat("SUMMARY STATISTICS:\n")
-    cat("  . Compounds analyzed: ", total, "\n")
-    cat("  . Successful fits: ", successful, " (", success_rate, "%)\n", sep = "")
-    cat("  . Failed fits: ", total - successful, "\n")
+    cat("  • Compounds analyzed: ", total, "\n")
+    cat("  • Successful fits: ", successful, " (", success_rate, "%)\n", sep = "")
+    cat("  • Failed fits: ", total - successful, "\n")
     
     if (enforce_bottom_threshold && threshold_count > 0) {
-      cat("  . IC50 values excluded (Bottom <=", bottom_threshold, "): ", threshold_count, "\n", sep = "")
+      cat("  • IC50 values excluded (Bottom ≥", bottom_threshold, "): ", threshold_count, "\n", sep = "")
       
       cat("\nCOMPOUNDS WITH EXCLUDED IC50 VALUES:\n")
       for (i in seq_along(threshold_affected)) {
         bottom_val <- summary_table$Bottom[summary_table$Compound == threshold_affected[i]]
-        cat("  . ", threshold_affected[i], " (Bottom = ", 
+        cat("  • ", threshold_affected[i], " (Bottom = ", 
             round(bottom_val, 1), ")\n", sep = "")
       }
     }
     
-    cat("  . Problematic curves: ", sum(grepl("shallow|Low R2|Small span", summary_table$Curve_Quality)), "\n")
+    cat("  • Problematic curves: ", sum(grepl("shallow|Low R²|Small span", summary_table$Curve_Quality)), "\n")
     
     if ("Curve_Quality" %in% names(summary_table)) {
       cat("\nCURVE QUALITY DISTRIBUTION:\n")
       quality_counts <- table(summary_table$Curve_Quality)
       for (quality in names(sort(quality_counts, decreasing = TRUE))) {
         count <- quality_counts[quality]
-        cat("  . ", sprintf("%-35s: %d (%.1f%%)", quality, count, count/total*100), "\n")
+        cat("  • ", sprintf("%-35s: %d (%.1f%%)", quality, count, count/total*100), "\n")
       }
     }
     cat(strrep("=", 50), "\n\n")

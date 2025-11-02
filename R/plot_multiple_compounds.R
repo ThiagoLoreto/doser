@@ -149,7 +149,7 @@
 plot_multiple_compounds <- function(results, compound_indices = NULL, 
                                     y_limits = c(0, 150),
                                     point_shapes = NULL,
-                                    colors = NULL,
+                                    colors = FALSE,
                                     legend_position = "right",
                                     show_grid = FALSE, show_legend = TRUE,
                                     save_plot = NULL, plot_width = 10, 
@@ -344,8 +344,17 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
     point_shapes <- rep(point_shapes, length.out = n_valid_compounds)
   }
   
-  # Color logic
-  use_colors <- if (!is.null(colors)) {
+  # Color logic - handles 3 cases: FALSE (black), TRUE (auto colors), custom colors
+  use_colors <- if (is.logical(colors)) {
+    if (isTRUE(colors)) {
+      # Automatic colorful mode
+      scales::hue_pal()(n_valid_compounds)
+    } else {
+      # Black mode (default when colors = FALSE)
+      rep("black", n_valid_compounds)
+    }
+  } else if (is.character(colors)) {
+    # Custom colors mode
     if (length(colors) < n_valid_compounds) {
       warning("Number of colors provided (", length(colors), ") is less than number of valid compounds (", n_valid_compounds, "). Recycling colors.")
       rep(colors, length.out = n_valid_compounds)
@@ -353,6 +362,7 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
       colors[1:n_valid_compounds]
     }
   } else {
+    # Fallback: black
     rep("black", n_valid_compounds)
   }
   
@@ -502,60 +512,32 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
     )
   
   # Add plot elements
-  if (!is.null(colors)) {
-    # Color mode
+  p <- p +
+    ggplot2::geom_line(data = all_curve_data, 
+                       ggplot2::aes(x = log_inhibitor, y = response, group = compound_display, color = compound_display),
+                       linewidth = 1, alpha = 0.7) +
+    ggplot2::geom_point(data = all_point_data,
+                        ggplot2::aes(x = log_inhibitor, y = mean_response, shape = compound_display, color = compound_display),
+                        size = point_size) +
+    ggplot2::scale_color_manual(
+      values = use_colors,
+      labels = wrapped_labels,
+      guide = "none"  # Remove color legend, keep only shape legend
+    ) +
+    ggplot2::scale_shape_manual(
+      values = point_shapes[1:n_valid_compounds],
+      labels = wrapped_labels
+    )
+  
+  if (show_error_bars && nrow(all_point_data) > 0) {
     p <- p +
-      ggplot2::geom_line(data = all_curve_data, 
-                         ggplot2::aes(x = log_inhibitor, y = response, group = compound_display, color = compound_display),
-                         linewidth = 1, alpha = 0.7) +
-      ggplot2::geom_point(data = all_point_data,
-                          ggplot2::aes(x = log_inhibitor, y = mean_response, shape = compound_display, color = compound_display),
-                          size = point_size) +
-      ggplot2::scale_color_manual(
-        values = use_colors,
-        labels = wrapped_labels,
-        guide = "none"
-      ) +
-      ggplot2::scale_shape_manual(
-        values = point_shapes[1:n_valid_compounds],
-        labels = wrapped_labels
-      )
-    
-    if (show_error_bars && nrow(all_point_data) > 0) {
-      p <- p +
-        ggplot2::geom_errorbar(data = all_point_data,
-                               ggplot2::aes(x = log_inhibitor, 
-                                            ymin = mean_response - sd_response, 
-                                            ymax = mean_response + sd_response,
-                                            group = compound_display, color = compound_display),
-                               width = error_bar_width, 
-                               linewidth = 0.5)
-    }
-  } else {
-    # Default black mode
-    p <- p +
-      ggplot2::geom_line(data = all_curve_data, 
-                         ggplot2::aes(x = log_inhibitor, y = response, group = compound_display),
-                         color = "black", linewidth = 1, alpha = 0.7) +
-      ggplot2::geom_point(data = all_point_data,
-                          ggplot2::aes(x = log_inhibitor, y = mean_response, shape = compound_display),
-                          color = "black", size = point_size) +
-      ggplot2::scale_shape_manual(
-        values = point_shapes[1:n_valid_compounds],
-        labels = wrapped_labels
-      )
-    
-    if (show_error_bars && nrow(all_point_data) > 0) {
-      p <- p +
-        ggplot2::geom_errorbar(data = all_point_data,
-                               ggplot2::aes(x = log_inhibitor, 
-                                            ymin = mean_response - sd_response, 
-                                            ymax = mean_response + sd_response,
-                                            group = compound_display),
-                               color = "black",
-                               width = error_bar_width, 
-                               linewidth = 0.5)
-    }
+      ggplot2::geom_errorbar(data = all_point_data,
+                             ggplot2::aes(x = log_inhibitor, 
+                                          ymin = mean_response - sd_response, 
+                                          ymax = mean_response + sd_response,
+                                          group = compound_display, color = compound_display),
+                             width = error_bar_width, 
+                             linewidth = 0.5)
   }
   
   # Configure legend columns
@@ -566,27 +548,15 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
   }
   
   # Configure legend appearance
-  if (!is.null(colors)) {
-    p <- p + ggplot2::guides(
-      shape = ggplot2::guide_legend(
-        ncol = ncol_final,
-        override.aes = list(
-          color = use_colors,
-          size = point_size
-        )
+  p <- p + ggplot2::guides(
+    shape = ggplot2::guide_legend(
+      ncol = ncol_final,
+      override.aes = list(
+        color = use_colors,  # Use defined colors (black or colored)
+        size = point_size
       )
     )
-  } else {
-    p <- p + ggplot2::guides(
-      shape = ggplot2::guide_legend(
-        ncol = ncol_final,
-        override.aes = list(
-          color = "black",
-          size = point_size
-        )
-      )
-    )
-  }
+  )
   
   # Hide legend if requested
   if (!show_legend) {
@@ -631,7 +601,8 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
     x_limits = x_limits,
     plot_dimensions = c(width = plot_width, height = plot_height, dpi = plot_dpi),
     file_saved = if (!is.null(save_plot)) filename else NULL,
-    smart_title_used = plot_title_final
+    smart_title_used = plot_title_final,
+    color_mode = if(isTRUE(colors)) "colorful" else "black"
   )
   
   attr(p, "metadata") <- metadata

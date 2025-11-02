@@ -151,49 +151,47 @@
 #' }
 
 
-
 save_multiple_sheets <- function(file_name, ..., decimal_comma = TRUE, decimal_places = 3, round_sheets = NULL) {
   if (!requireNamespace("openxlsx", quietly = TRUE)) {
     stop("Package 'openxlsx' is required. Please install it.")
   }
   
-  # Funcao que NUNCA converte a coluna "RowNames"
+  # Function that NEVER converts the "RowNames" column
   convert_decimal_separator <- function(df, decimal_places = 3, apply_rounding = TRUE) {
     if (!is.data.frame(df)) return(df)
     
-    df_conv <- df  # Comecar com copia do original
+    df_conv <- df  # Start with copy of original
     
-    # Aplicar conversao apenas nas colunas que NAO sao "RowNames"
+    # Apply conversion only to columns that are NOT "RowNames"
     for (col_name in names(df_conv)) {
-      if (col_name == "RowNames") next  # Pular a coluna RowNames
+      if (col_name == "RowNames") next  # Skip RowNames column
       
       column <- df_conv[[col_name]]
       char_column <- as.character(column)
       
-      # Aplicar substituicao apenas em valores que sao numeros
+      # Apply substitution only to numeric values
       result <- sapply(char_column, function(x) {
         if (is.na(x)) return(NA_character_)
         
         x_clean <- trimws(x)
         
-        # Verificar se e numero (incluindo notacao cientifica)
+        # Check if it's a number (including scientific notation)
         if (grepl("^-?\\d*\\.\\d+$", x_clean) ||
             grepl("^-?\\d+\\.\\d*$", x_clean) ||
             grepl("^-?\\d*\\.?\\d+[eE][-+]?\\d+$", x_clean)) {
           
           num_value <- as.numeric(x_clean)
           if (!is.na(num_value)) {
-            # Aplicar arredondamento apenas se solicitado
+            # Apply rounding only if requested
             if (apply_rounding) {
               rounded_value <- round(num_value, decimal_places)
             } else {
               rounded_value <- num_value
             }
             
-            # Manter a representacao original (pode incluir notacao cientifica)
             formatted_value <- as.character(rounded_value)
             
-            # Apenas substituir ponto por virgula
+            # Replace dot with comma
             gsub("\\.", ",", formatted_value)
           } else {
             x_clean
@@ -209,7 +207,7 @@ save_multiple_sheets <- function(file_name, ..., decimal_comma = TRUE, decimal_p
     return(df_conv)
   }
   
-  # Funcao simples para adicionar rownames
+  # Simple function to add row names
   add_rownames_column <- function(df) {
     if (!is.data.frame(df)) return(df)
     
@@ -220,26 +218,26 @@ save_multiple_sheets <- function(file_name, ..., decimal_comma = TRUE, decimal_p
     }
   }
   
-  # Criar workbook
+  # Create workbook
   wb <- openxlsx::createWorkbook()
   
-  # Obter objetos
+  # Get objects
   objects <- list(...)
   object_names <- as.character(substitute(list(...)))[-1]
   
-  # Processar CADA sheet
+  # Process EACH sheet
   for (i in seq_along(objects)) {
     current_df <- objects[[i]]
     sheet_name <- object_names[i]
     
     openxlsx::addWorksheet(wb, sheet_name)
     
-    # **PRIMEIRO adicionar rownames**
+    # FIRST add row names
     current_df <- add_rownames_column(current_df)
     
-    # **DEPOIS converter (a funcao vai pular a coluna "RowNames")**
+    # THEN convert (function will skip "RowNames" column)
     if (decimal_comma) {
-      # Verificar se deve aplicar ARREDONDAMENTO nesta sheet
+      # Check if should apply ROUNDING to this sheet
       apply_rounding <- TRUE
       if (!is.null(round_sheets)) {
         apply_rounding <- i %in% round_sheets
@@ -251,7 +249,7 @@ save_multiple_sheets <- function(file_name, ..., decimal_comma = TRUE, decimal_p
     openxlsx::writeData(wb, sheet_name, current_df, rowNames = FALSE)
   }
   
-  # Salvar
+  # Save
   openxlsx::saveWorkbook(wb, file_name, overwrite = TRUE)
-  message("? Arquivo salvo: ", file_name)
+  message("File saved: ", file_name)
 }
