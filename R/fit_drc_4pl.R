@@ -279,7 +279,7 @@ fit_drc_4pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
     # Biological limits
     bottom_limits <- if (curve_type == "activation") c(-100, Inf) else c(-100, 600)
     top_limits <- c(0, 700)
-    logIC50_limits <- c(-10, 2)
+    logIC50_limits <- c(-20, 5)
     hill_slope_limits <- c(-5, 5)
     
     corrections <- list()

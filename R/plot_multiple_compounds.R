@@ -1,36 +1,46 @@
 #' Plot Multiple Dose-Response Curves
 #'
-#' Generates a composite plot of multiple dose-response curves with customizable
-#' appearance and intelligent title generation. The function automatically
-#' determines optimal plot settings based on the number of compounds and
-#' generates intelligent titles when compounds share the same target or compound name.
+#' The `plot_multiple_compounds()` function generates a consolidated plot of 
+#' fitted dose-response curves for multiple compounds, allowing visual 
+#' comparison between different responses. It provides extensive customization 
+#' options for colors, shapes, titles, legends, gridlines, and file export.
 #'
-#' @param results List containing dose-response analysis results with detailed_results
-#'               component containing individual compound fits
+#' @param results A list containing results from dose-response analysis. 
+#'   Expected to include a sublist `detailed_results`, where each 
+#'   element contains at least `model`, `data`, `success`, and `compound`.
 #' @param compound_indices Numeric vector specifying which compounds to include in the plot
+#'   If `NULL` (default), all available compounds in `results$detailed_results` 
+#'   are included.
 #' @param y_limits Numeric vector of length 2 specifying the y-axis limits
 #' @param point_shapes Numeric vector of point shapes for different compounds
 #' @param colors Character vector of colors for different compound curves
-#' @param legend_position Character specifying legend position
+#'   - `FALSE` (default): all curves and points are black;
+#'   - `TRUE`: automatically assigns distinct colors (via `scales::hue_pal()`);
+#'   - Character vector of custom colors (recycled if shorter than the number of compounds).
+#' @param legend_position Position of the legend: one of `"right"`, `"left"`, 
+#'   `"top"`, `"bottom"`, or `"none"`. Default: `"right"`.
 #' @param show_grid Logical indicating whether to show background grid lines
 #' @param show_legend Logical indicating whether to display the legend
-#' @param save_plot Character string with filename to save plot or logical to auto-generate filename
-#' @param plot_width Numeric value for plot width in inches
-#' @param plot_height Numeric value for plot height in inches
-#' @param plot_dpi Numeric value for plot resolution in dots per inch
+#' @param save_plot File path to save the plot (e.g., `"plots/multi_curves.png"`).  
+#'   If `TRUE`, the function automatically generates a filename.  
+#'   Default: `NULL` (does not save).
+#' @param plot_width,plot_height Plot dimensions (in inches) when saving.
+#' @param plot_dpi Resolution (in DPI) for saved plots. Default: `600`.
 #' @param axis_label_size Numeric value for axis title font size
 #' @param axis_text_size Numeric value for axis tick label font size
 #' @param show_error_bars Logical indicating whether to display error bars around data points
 #' @param error_bar_width Numeric value controlling the width of error bars
-#' @param plot_title Character string for plot title (NULL for automatic title generation)
+#' @param plot_title Custom plot title. If `NULL`, a smart title is generated 
+#'   automatically based on the compound names.
 #' @param legend_text_size Numeric value for legend text font size
 #' @param legend_title_size Numeric value for legend title font size
-#' @param legend_key_height Numeric value for height of legend keys
+#' @param legend_key_height Height (in points) of legend keys. Automatically adjusted.
 #' @param legend_ncol Numeric value specifying number of columns in legend
-#' @param legend_label_wrap Numeric value specifying maximum characters per line in legend labels
+#' @param legend_label_wrap Maximum character width before legend labels 
+#'   automatically wrap to new lines. Default: `25`.
 #' @param plot_ratio Numeric value for plot aspect ratio (width/height)
-#' @param legend_title Character string for legend title
-#' @param legend_labels Character vector of custom labels for legend (overrides compound names)
+#' @param legend_title Title for the legend (displayed above symbols).
+#' @param legend_labels Character vector of custom labels for legend (overrides target/compound names)
 #'
 #'
 #'@importFrom ggplot2 aes
@@ -55,10 +65,10 @@
 #'   - smart_title_used: Title actually displayed on plot
 #'
 #' @details
-#' This function creates professional multi-curve dose-response plots using ggplot2
-#' with intelligent defaults optimized for scientific publications. The default
-#' styling uses black lines with different point shapes for optimal differentiation
-#' in black-and-white publications, while supporting custom colors for presentations.
+#' This function overlays fitted dose-response curves (based on nonlinear models)
+#' together with empirical mean ± SD values for each concentration, allowing
+#' direct visual comparison across multiple compounds or experimental conditions.
+#'
 #'
 #' \strong{Key Features:}
 #' \itemize{
@@ -81,44 +91,60 @@
 #'
 #' @examples
 #' \dontrun{
-#' # Example 1: Default black-and-white with automatic point shapes
-#' analysis_results <- fit_dose_response(my_data, normalize = TRUE)
-#' 
-#' # Plot compounds with default settings (black lines, different point shapes)
-#' p <- plot_multiple_compounds(
-#'   analysis_results,
-#'   compound_indices = c(1, 3, 5, 7),
-#'   plot_title = "Selected Compound Comparison"
-#' )
-#' print(p)
-#' 
-#' # Example 2: Custom colors for presentation
-#' p <- plot_multiple_compounds(
-#'   analysis_results,
+#' # Example 1: Basic plot for all compounds
+#' p1 <- plot_multiple_compounds(results)
+#' print(p1)
+#'
+#' # Example 2: Select specific compounds by index
+#' p2 <- plot_multiple_compounds(results, compound_indices = c(1, 3, 5))
+#'
+#' # Example 3: Enable automatic coloring and save the plot
+#' p3 <- plot_multiple_compounds(
+#'   results,
 #'   compound_indices = 1:4,
-#'   colors = c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3"), # ColorBrewer palette
-#'   plot_title = "Colored Dose-Response Curves",
-#'   legend_title = "Test Compounds"
+#'   colors = TRUE,
+#'   save_plot = "plots/multi_colored_curves.png"
 #' )
-#' print(p)
-#' 
-#' # Example 3: Publication-ready with custom point shapes
-#' p <- plot_multiple_compounds(
-#'   analysis_results,
-#'   compound_indices = 1:6,
-#'   point_shapes = c(15, 16, 17, 18, 0, 1), # Specific shapes
-#'   plot_title = "Custom Point Shapes",
+#'
+#' # Example 4: Customize legend labels and point shapes
+#' p4 <- plot_multiple_compounds(
+#'   results,
+#'   compound_indices = 1:3,
+#'   legend_labels = c("Compound A", "Compound B", "Compound C"),
+#'   point_shapes = c(15, 17, 19),
+#'   legend_title = "Treatments"
+#' )
+#'
+#' # Example 5: Disable error bars and use black-and-white mode
+#' p5 <- plot_multiple_compounds(
+#'   results,
+#'   colors = FALSE,
+#'   show_error_bars = FALSE,
+#'   show_grid = TRUE,
+#'   plot_title = "Curves without error bars"
+#' )
+#'
+#' # Example 6: Place legend below the plot in multiple columns
+#' p6 <- plot_multiple_compounds(
+#'   results,
 #'   legend_position = "bottom",
-#'   legend_ncol = 3
+#'   legend_ncol = 3,
+#'   colors = TRUE
 #' )
-#' print(p)
+#'
+#' # Example 7: Plot without any legend
+#' p7 <- plot_multiple_compounds(results, show_legend = FALSE)
+#'
+#' # Example 8: Fine-tune fonts, limits, and title
+#' p8 <- plot_multiple_compounds(
+#'   results,
+#'   compound_indices = 1:2,
+#'   y_limits = c(0, 120),
+#'   axis_label_size = 16,
+#'   axis_text_size = 13,
+#'   plot_title = "Comparison of Two Compounds"
+#' )
 #' 
-#'
-#'
-#' # Example 4: Custom legend labels and title
-#' plot_multiple_compounds(results,
-#'                        legend_labels = c("Experiment 1", "Experiment 2", "Experiment 3"),
-#'                        plot_title = "My Custom Title")
 #' 
 #' 
 #' # Extract metadata for reproducibility
@@ -138,6 +164,7 @@
 #'
 #' @seealso
 #' \code{\link{fit_dose_response}} for generating input data
+#' \code{\link{fit_drc_4pl}} for generating input data
 #' \code{\link[ggplot2]{ggplot}} for underlying plotting functionality
 #'
 #' @export
