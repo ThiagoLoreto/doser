@@ -54,7 +54,7 @@ A list containing the following components:
 }
 }
 \description{
-The \code{fit_drc_3pl()} function fits a three-parameter logistic (3PL) dose–response
+The \code{fit_drc_3pl()} function fits a three-parameter logistic (3PL) dose-response
 model to experimental data. It supports duplicate measurements, normalization,
 and optional filtering of low bottom values. The function computes fitted parameters,
 model statistics, and diagnostic metrics, providing a concise summary of model performance.

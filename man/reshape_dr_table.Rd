@@ -8,7 +8,7 @@ reshape_dr_table(results_table, output_file = NULL, decimal_comma = FALSE)
 }
 \arguments{
 \item{results_table}{Data frame containing dose-response analysis results
-from \code{\link{fit_dose_response}} function.}
+from \code{\link{fit_drc_3pl}} function.}
 
 \item{output_file}{Character string specifying the output Excel file path
 (default: NULL, no file saved).}
@@ -120,7 +120,7 @@ For pharmacological data reporting standards:
 }
 }
 \seealso{
-\code{\link{fit_dose_response}} for generating analysis results
+\code{\link{fit_drc_3pl}} for generating analysis results
 \code{\link{save_multiple_sheets}} for advanced Excel export options
 \code{\link{plot_multiple_compounds}} for visual comparison of results
 }

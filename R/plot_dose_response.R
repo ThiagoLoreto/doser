@@ -4,7 +4,7 @@
 #' Features professional styling, error bars, fitted curves, IC50 visualization, and 
 #' multiple export formats. Optimized for scientific publications.
 #'
-#' @param results List object returned by \code{\link{fit_dose_response}} containing
+#' @param results List object returned by \code{\link{fit_drc_3pl}} containing
 #'   dose-response analysis results.
 #' @param compound_index Numeric index specifying which compound to plot (default: 1).
 #' @param y_limits Numeric vector of length 2 specifying y-axis limits (default: c(0, 150)).
@@ -88,7 +88,7 @@
 #' @examples
 #' \dontrun{
 #' # Perform dose-response analysis first
-#' analysis_results <- fit_dose_response(my_data, normalize = TRUE)
+#' analysis_results <- fit_drc_3pl(my_data, normalize = TRUE)
 #'
 #' # Basic plot for first compound
 #' p <- plot_dose_response(analysis_results)
@@ -150,7 +150,7 @@
 #' }
 #'
 #' @seealso
-#' \code{\link{fit_dose_response}} for generating analysis results
+#' \code{\link{fit_drc_3pl}} for generating analysis results
 #' \code{\link[ggplot2]{ggplot}} for underlying plotting functionality
 #' \code{\link[ggplot2]{ggsave}} for plot export functionality
 #'

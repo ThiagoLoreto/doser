@@ -31,7 +31,7 @@ plot_dose_response(
 )
 }
 \arguments{
-\item{results}{List object returned by \code{\link{fit_dose_response}} containing
+\item{results}{List object returned by \code{\link{fit_drc_3pl}} containing
 dose-response analysis results.}
 
 \item{compound_index}{Numeric index specifying which compound to plot (default: 1).}
@@ -166,7 +166,7 @@ The function provides extensive customization options while maintaining professi
 \examples{
 \dontrun{
 # Perform dose-response analysis first
-analysis_results <- fit_dose_response(my_data, normalize = TRUE)
+analysis_results <- fit_drc_3pl(my_data, normalize = TRUE)
 
 # Basic plot for first compound
 p <- plot_dose_response(analysis_results)
@@ -216,7 +216,7 @@ For visualization best practices in scientific publications:
 }
 }
 \seealso{
-\code{\link{fit_dose_response}} for generating analysis results
+\code{\link{fit_drc_3pl}} for generating analysis results
 \code{\link[ggplot2]{ggplot}} for underlying plotting functionality
 \code{\link[ggplot2]{ggsave}} for plot export functionality
 }

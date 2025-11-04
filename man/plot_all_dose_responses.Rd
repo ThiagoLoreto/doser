@@ -14,7 +14,7 @@ plot_all_dose_responses(
 )
 }
 \arguments{
-\item{results}{List object returned by \code{\link{fit_dose_response}} containing
+\item{results}{List object returned by \code{\link{fit_drc_3pl}} containing
 dose-response analysis results.}
 
 \item{compounds}{Character or numeric vector specifying which compounds to plot.
@@ -152,5 +152,5 @@ plot_all_dose_responses(
 \seealso{
 \code{\link{plot_dose_response}} for individual plot customization
 \code{\link{plot_multiple_compounds}} for multi-curve comparison plots
-\code{\link{fit_dose_response}} for generating analysis results
+\code{\link{fit_drc_3pl}} for generating analysis results
 }

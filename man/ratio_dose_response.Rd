@@ -134,7 +134,7 @@ processed_data <- ratio_dose_response(
 analysis_ready_data <- processed_data$modified_ratio_table
 
 # Proceed to dose-response curve fitting
-dr_results <- fit_dose_response(analysis_ready_data, normalize = TRUE)
+dr_results <- fit_drc_3pl(analysis_ready_data, normalize = TRUE)
 }
 
 }
@@ -147,6 +147,6 @@ For raw data processing in dose-response assays:
 }
 }
 \seealso{
-\code{\link{fit_dose_response}} for the next step in the analysis pipeline
+\code{\link{fit_drc_3pl}} for the next step in the analysis pipeline
 \code{\link{plot_dose_response}} for visualization of processed data
 }

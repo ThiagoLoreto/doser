@@ -95,7 +95,7 @@ The \code{round_sheets} parameter enables precise control:
 \dontrun{
 # Example 1: Exporting comprehensive dose-response analysis results
 # Perform analysis first
-analysis_results <- fit_dose_response(my_data, normalize = TRUE)
+analysis_results <- fit_drc_3pl(my_data, normalize = TRUE)
 
 # Export complete results with European decimal format
 save_multiple_sheets(
@@ -131,8 +131,8 @@ save_multiple_sheets(
 
 # Example 4: Multiple analysis batches
 # Analyze different experimental conditions
-control_results <- fit_dose_response(control_data)
-treated_results <- fit_dose_response(treated_data)
+control_results <- fit_drc_3pl(control_data)
+treated_results <- fit_drc_3pl(treated_data)
 
 save_multiple_sheets(
   "experimental_conditions.xlsx",
@@ -169,7 +169,7 @@ For scientific data presentation standards:
 }
 }
 \seealso{
-\code{\link{fit_dose_response}} for generating analysis results
+\code{\link{fit_drc_3pl}} for generating analysis results
 \code{\link{reshape_dr_table}} for creating structured result tables
 \code{\link[openxlsx]{write.xlsx}} for basic Excel export functionality
 }

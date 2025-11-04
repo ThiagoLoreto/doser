@@ -4,7 +4,7 @@
 #' in batch mode. Ideal for generating comprehensive visualization sets for screening
 #' data, compound libraries, or publication supplements.
 #'
-#' @param results List object returned by \code{\link{fit_dose_response}} containing
+#' @param results List object returned by \code{\link{fit_drc_3pl}} containing
 #'   dose-response analysis results.
 #' @param compounds Character or numeric vector specifying which compounds to plot.
 #'   Use "all" for all compounds or provide specific numeric indices (default: "all").
@@ -124,7 +124,7 @@
 #' @seealso
 #' \code{\link{plot_dose_response}} for individual plot customization
 #' \code{\link{plot_multiple_compounds}} for multi-curve comparison plots
-#' \code{\link{fit_dose_response}} for generating analysis results
+#' \code{\link{fit_drc_3pl}} for generating analysis results
 #'
 #' @export
 

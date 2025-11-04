@@ -4,7 +4,7 @@
 #' organizing parameters into logical sections following industry standards.
 #'
 #' @param results_table Data frame containing dose-response analysis results
-#'   from \code{\link{fit_dose_response}} function.
+#'   from \code{\link{fit_drc_3pl}} function.
 #' @param output_file Character string specifying the output Excel file path
 #'   (default: NULL, no file saved).
 #' @param decimal_comma Logical indicating whether to use comma as decimal separator
@@ -96,7 +96,7 @@
 #' }
 #'
 #' @seealso
-#' \code{\link{fit_dose_response}} for generating analysis results
+#' \code{\link{fit_drc_3pl}} for generating analysis results
 #' \code{\link{save_multiple_sheets}} for advanced Excel export options
 #' \code{\link{plot_multiple_compounds}} for visual comparison of results
 #'

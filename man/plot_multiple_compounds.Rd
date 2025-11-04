@@ -221,7 +221,7 @@ write.csv(styling_info, "plot_styling.csv", row.names = FALSE)
 
 }
 \seealso{
-\code{\link{fit_dose_response}} for generating input data
+\code{\link{fit_drc_3pl}} for generating input data
 \code{\link{fit_drc_4pl}} for generating input data
 \code{\link[ggplot2]{ggplot}} for underlying plotting functionality
 }
