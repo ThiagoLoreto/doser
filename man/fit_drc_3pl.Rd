@@ -2,7 +2,7 @@
 % Please edit documentation in R/fit_dose_response.R
 \name{fit_drc_3pl}
 \alias{fit_drc_3pl}
-\title{Fit Dose-Response - 3 Parameter Curves and Calculate IC50 Values}
+\title{Fit a 3-Parameter Logistic Dose-Response Model}
 \usage{
 fit_drc_3pl(
   data,
@@ -54,9 +54,10 @@ A list containing the following components:
 }
 }
 \description{
-Performs robust nonlinear regression analysis of dose-response data using
-3-parameter logistic models. The function handles data validation, curve fitting,
-parameter estimation, quality assessment, and export of results.
+The \code{fit_drc_3pl()} function fits a three-parameter logistic (3PL) dose–response
+model to experimental data. It supports duplicate measurements, normalization,
+and optional filtering of low bottom values. The function computes fitted parameters,
+model statistics, and diagnostic metrics, providing a concise summary of model performance.
 }
 \details{
 This function performs comprehensive dose-response analysis using the following steps:
@@ -93,10 +94,10 @@ This function performs comprehensive dose-response analysis using the following 
 
 The input data should be structured as follows:
 \preformatted{
-  log_conc  Compound1_rep1  Compound1_rep2  Compound2_rep1  Compound2_rep2 ...
-  -9.0      25.1           26.3            18.7            19.2
-  -8.0      30.5           31.2            22.1            23.4
-  -7.0      45.2           46.8            35.6            36.9
+  log_conc  Targ/Comp1_rep1  Targ/Comp1_rep2  Targ/Comp2_rep1  Targ/Comp2_rep2 ...
+  -9.0      25.1             26.3            18.7            19.2
+  -8.0      30.5             31.2            22.1            23.4
+  -7.0      45.2             46.8            35.6            36.9
   ...       ...            ...             ...             ...
 }
 }

@@ -54,6 +54,14 @@
 #'   Rows 26-27:   Separator or additional headers (ignored)
 #'   Rows 28-43:   Second measurement subtable (e.g., acceptor channel or timepoint 2)
 #' }
+#' 
+#' \strong{Typical info_table structure:}
+#' \preformatted{
+#' Column 1: log(inhibitor) - Numeric values of inhibitor concentrations in log scale
+#' Column 2: Plate_Row - Row identifiers matching the ratio table (e.g., "A", "B", "C", etc.)
+#' Column 3: Target - Target protein identifiers (e.g., "BRD4", "EGFR", "KRAS")
+#' Column 4: Compound - Compound identifiers (e.g., "JQ1", "Gefitinib", "ARS-1620")
+#' }
 #'
 #' \strong{Quality Metrics for Raw Data Assessment:}
 #' \itemize{
