@@ -95,9 +95,9 @@ This function performs comprehensive dose-response analysis using the following 
 The input data should be structured as follows:
 \preformatted{
   log_conc  Targ/Comp1_rep1  Targ/Comp1_rep2  Targ/Comp2_rep1  Targ/Comp2_rep2 ...
-  -9.0      25.1             26.3            18.7            19.2
-  -8.0      30.5             31.2            22.1            23.4
-  -7.0      45.2             46.8            35.6            36.9
+    NA      25.1              25.1            25.1            25.1
+  -8.0      30.5              31.2            22.1            23.4
+  -7.0      45.2              46.8            35.6            36.9
   ...       ...            ...             ...             ...
 }
 }
