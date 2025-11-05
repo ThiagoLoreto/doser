@@ -151,15 +151,8 @@ ratio_dose_response <- function(data,
   subtable1_num <- convert_to_numeric_df(subtable1, final_rownames)
   subtable2_num <- convert_to_numeric_df(subtable2, final_rownames)
   
-  replace_low_values <- function(df, controls) {
-    all_cols <- colnames(df)
-    non_control_cols <- if (!is.null(controls)) {
-      setdiff(all_cols, as.character(controls))
-    } else {
-      all_cols
-    }
-    
-    for (col in non_control_cols) {
+  replace_low_values <- function(df) {
+    for (col in colnames(df)) {
       low_vals <- df[[col]] < 1000 & !is.na(df[[col]])
       if (any(low_vals)) {
         n_replaced <- sum(low_vals, na.rm = TRUE)
@@ -170,13 +163,7 @@ ratio_dose_response <- function(data,
     return(df)
   }
   
-  controls_vec <- if (!is.null(control_0perc) && !is.null(control_100perc)) {
-    c(control_0perc, control_100perc)
-  } else {
-    NULL
-  }
-  
-  subtable1_num <- replace_low_values(subtable1_num, controls_vec)
+  subtable1_num <- replace_low_values(subtable1_num)
   
   if (any(subtable1_num == 0, na.rm = TRUE)) {
     warning("Division by zero detected in ratio calculation - replacing with NA")
