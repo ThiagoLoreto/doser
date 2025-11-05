@@ -21,9 +21,9 @@
 #'   `"top"`, `"bottom"`, or `"none"`. Default: `"right"`.
 #' @param show_grid Logical indicating whether to show background grid lines
 #' @param show_legend Logical indicating whether to display the legend
-#' @param save_plot File path to save the plot (e.g., `"plots/multi_curves.png"`).  
-#'   If `TRUE`, the function automatically generates a filename.  
-#'   Default: `NULL` (does not save).
+#' @param save_plot Defines whether to save the plot: \code{NULL} (do not save, default), 
+#'   \code{TRUE} (automatically saves as PNG with default name), or a file path with extension 
+#'   (\code{.png}, \code{.pdf}, \code{.jpeg}, \code{.tiff}, \code{.svg}, \code{.eps}) to save in a specific format.
 #' @param plot_width,plot_height Plot dimensions (in inches) when saving.
 #' @param plot_dpi Resolution (in DPI) for saved plots. Default: `600`.
 #' @param axis_label_size Numeric value for axis title font size
@@ -168,7 +168,6 @@
 #' \code{\link[ggplot2]{ggplot}} for underlying plotting functionality
 #'
 #' @export
-
 
 
 
@@ -516,7 +515,7 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
       x = expression(paste("Log"[10], " Concentration [M]")),
       y = ifelse(results$normalized, "Normalized BRET ratio [%]", "BRET ratio"),
       title = plot_title_final,
-      shape = legend_title_final
+      color = legend_title_final
     ) +
     ggplot2::coord_cartesian(xlim = x_limits, ylim = y_limits) +
     ggplot2::theme_minimal() +
@@ -538,22 +537,25 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
       plot.background = ggplot2::element_rect(fill = "white", color = NA)
     )
   
-  # Add plot elements
+  # Add plot elements 
   p <- p +
     ggplot2::geom_line(data = all_curve_data, 
-                       ggplot2::aes(x = log_inhibitor, y = response, group = compound_display, color = compound_display),
+                       ggplot2::aes(x = log_inhibitor, y = response, 
+                                    group = compound_display, 
+                                    color = compound_display), 
                        linewidth = 1, alpha = 0.7) +
     ggplot2::geom_point(data = all_point_data,
-                        ggplot2::aes(x = log_inhibitor, y = mean_response, shape = compound_display, color = compound_display),
+                        ggplot2::aes(x = log_inhibitor, y = mean_response, 
+                                     shape = compound_display, 
+                                     color = compound_display),
                         size = point_size) +
     ggplot2::scale_color_manual(
       values = use_colors,
-      labels = wrapped_labels,
-      guide = "none"  # Remove color legend, keep only shape legend
+      labels = wrapped_labels
     ) +
     ggplot2::scale_shape_manual(
       values = point_shapes[1:n_valid_compounds],
-      labels = wrapped_labels
+      guide = "none" 
     )
   
   if (show_error_bars && nrow(all_point_data) > 0) {
@@ -562,7 +564,8 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
                              ggplot2::aes(x = log_inhibitor, 
                                           ymin = mean_response - sd_response, 
                                           ymax = mean_response + sd_response,
-                                          group = compound_display, color = compound_display),
+                                          group = compound_display, 
+                                          color = compound_display), 
                              width = error_bar_width, 
                              linewidth = 0.5)
   }
@@ -574,14 +577,18 @@ plot_multiple_compounds <- function(results, compound_indices = NULL,
     ncol_final <- if (n_valid_compounds > 10) 2 else 1
   }
   
-  # Configure legend appearance
+  # Configure legend appearance 
   p <- p + ggplot2::guides(
-    shape = ggplot2::guide_legend(
+    color = ggplot2::guide_legend(
       ncol = ncol_final,
       override.aes = list(
-        color = use_colors,  # Use defined colors (black or colored)
-        size = point_size
-      )
+        shape = point_shapes[1:n_valid_compounds],
+        size = point_size,                      
+        linetype = 1,                          
+        linewidth = 0.8,                       
+        fill = NA                                 
+      ),
+      title = legend_title_final
     )
   )
   

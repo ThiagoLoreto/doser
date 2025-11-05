@@ -17,8 +17,9 @@
 #' @param show_ic50_line Logical indicating whether to show vertical IC50 line (default: TRUE).
 #' @param show_legend Logical indicating whether to show parameter legend (default: FALSE).
 #' @param show_grid Logical indicating whether to show background grid (default: FALSE).
-#' @param save_plot Either a file path for saving the plot, or TRUE for automatic naming
-#'   (default: NULL, no saving).
+#' @param save_plot Defines whether to save the plot: \code{NULL} (do not save, default), 
+#'   \code{TRUE} (automatically saves as PNG with default name), or a file path with extension 
+#'   (\code{.png}, \code{.pdf}, \code{.jpeg}, \code{.tiff}, \code{.svg}, \code{.eps}) to save in a specific format.
 #' @param plot_width Plot width in inches for saved plots (default: 10).
 #' @param plot_height Plot height in inches for saved plots (default: 8).
 #' @param plot_dpi Resolution for saved raster images (default: 600).

@@ -56,8 +56,9 @@ dose-response analysis results.}
 
 \item{show_grid}{Logical indicating whether to show background grid (default: FALSE).}
 
-\item{save_plot}{Either a file path for saving the plot, or TRUE for automatic naming
-(default: NULL, no saving).}
+\item{save_plot}{Defines whether to save the plot: \code{NULL} (do not save, default),
+\code{TRUE} (automatically saves as PNG with default name), or a file path with extension
+(\code{.png}, \code{.pdf}, \code{.jpeg}, \code{.tiff}, \code{.svg}, \code{.eps}) to save in a specific format.}
 
 \item{plot_width}{Plot width in inches for saved plots (default: 10).}
 

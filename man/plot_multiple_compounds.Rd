@@ -59,9 +59,9 @@ are included.}
 
 \item{show_legend}{Logical indicating whether to display the legend}
 
-\item{save_plot}{File path to save the plot (e.g., \code{"plots/multi_curves.png"}).
-If \code{TRUE}, the function automatically generates a filename.
-Default: \code{NULL} (does not save).}
+\item{save_plot}{Defines whether to save the plot: \code{NULL} (do not save, default),
+\code{TRUE} (automatically saves as PNG with default name), or a file path with extension
+(\code{.png}, \code{.pdf}, \code{.jpeg}, \code{.tiff}, \code{.svg}, \code{.eps}) to save in a specific format.}
 
 \item{plot_width, plot_height}{Plot dimensions (in inches) when saving.}
 
