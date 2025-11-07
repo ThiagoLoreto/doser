@@ -172,7 +172,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
                                point_color = "black", line_color = "black", 
                                ic50_line_color = "gray", point_size = 1, 
                                line_width = 2, error_bar_width = 0.01,
-                               show_ic50_line = TRUE, show_legend = FALSE,
+                               show_ic50_line = TRUE, show_legend = TRUE,
                                show_grid = FALSE, save_plot = NULL, 
                                plot_width = 10, plot_height = 8, plot_dpi = 600,
                                axis_label_size = 14, axis_text_size = 14,
@@ -238,13 +238,14 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     stop("No valid data points available or missing required columns")
   }
   
-  # Calculate summary statistics (mean ? SD per concentration)
+  # Calculate summary statistics (mean +- SD per concentration)
   calculate_summary_stats <- function(data) {
     summary_data <- do.call(rbind, lapply(split(data, data$log_inhibitor), function(sub_df) {
+      n_rep <- nrow(sub_df)
       data.frame(
         log_inhibitor = unique(sub_df$log_inhibitor),
         mean_response = mean(sub_df$response, na.rm = TRUE),
-        sd_response = sd(sub_df$response, na.rm = TRUE),
+        sd_response = if(n_rep > 1) sd(sub_df$response, na.rm = TRUE) else 0,
         n_replicates = nrow(sub_df)
       )
     }))
@@ -354,7 +355,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
         legend_text <- c(legend_text, "IC50 = NA")
       }
       
-      legend_text <- c(legend_text, paste("R2 =", r_squared))
+      legend_text <- c(legend_text, paste("R² =", r_squared))
       
       return(legend_text)
       
@@ -384,7 +385,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
       axis.line = ggplot2::element_line(color = "black"),
       axis.ticks = ggplot2::element_line(color = "black"),
       plot.title = ggplot2::element_text(size = axis_label_size + 2, face = "bold", hjust = 0.5, color = "black"),
-      legend.position = "none",  # Using custom annotation instead
+      legend.position = "none",  
       panel.grid.major = ggplot2::element_line(color = ifelse(show_grid, "grey90", "white")),
       panel.grid.minor = ggplot2::element_line(color = ifelse(show_grid, "grey95", "white")),
       panel.background = ggplot2::element_rect(fill = "white", color = NA),
@@ -517,3 +518,4 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
   attr(p, "metadata") <- metadata
   return(p)
 }
+
