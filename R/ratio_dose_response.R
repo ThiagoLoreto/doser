@@ -129,7 +129,8 @@
 ratio_dose_response <- function(data, 
                                 control_0perc = NULL, control_100perc = NULL,
                                 split_replicates = TRUE, info_table = NULL,
-                                save_to_excel = NULL, verbose = TRUE) {
+                                save_to_excel = NULL, verbose = TRUE,
+                                low_value_threshold = 1000) {
   
   if (nrow(data) < 43) {
     stop("Data must have at least 43 rows")
@@ -151,12 +152,12 @@ ratio_dose_response <- function(data,
   subtable1_num <- convert_to_numeric_df(subtable1, final_rownames)
   subtable2_num <- convert_to_numeric_df(subtable2, final_rownames)
   
-  replace_low_values <- function(df) {
+  replace_low_values <- function(df, threshold = low_value_threshold) { 
     for (col in colnames(df)) {
-      low_vals <- df[[col]] < 1000 & !is.na(df[[col]])
+      low_vals <- df[[col]] < threshold & !is.na(df[[col]])
       if (any(low_vals)) {
         n_replaced <- sum(low_vals, na.rm = TRUE)
-        warning("Replaced ", n_replaced, " value(s) < 1000 with NA in column '", col, "'")
+        warning("Replaced ", n_replaced, " value(s) < ", threshold, " with NA in column '", col, "'")
         df[[col]][low_vals] <- NA
       }
     }

@@ -170,8 +170,6 @@
 #' @export
 
 
-
-
 plot_multiple_compounds <- function(results, compound_indices = NULL, 
                                     y_limits = c(0, 150),
                                     point_shapes = NULL,

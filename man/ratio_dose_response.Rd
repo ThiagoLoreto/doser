@@ -11,7 +11,8 @@ ratio_dose_response(
   split_replicates = TRUE,
   info_table = NULL,
   save_to_excel = NULL,
-  verbose = TRUE
+  verbose = TRUE,
+  low_value_threshold = 1000
 )
 }
 \arguments{
