@@ -2,13 +2,13 @@
 % Please edit documentation in R/plot_drc_batch.R
 \name{plot_drc_batch}
 \alias{plot_drc_batch}
-\title{Plot Dose-Response Curves from Batch DRC Analysis}
+\title{Plot Dose-Response Curves (DRC) from Batch Analysis Results}
 \usage{
 plot_drc_batch(
   batch_drc_results,
   target_compound = NULL,
   position = NULL,
-  y_limits = c(0, 150),
+  y_limits = NULL,
   colors = NULL,
   point_shapes = NULL,
   show_error_bars = TRUE,
@@ -16,6 +16,11 @@ plot_drc_batch(
   show_legend = TRUE,
   shape_by_duplicate = FALSE,
   show_grid = FALSE,
+  font_family = "sans",
+  facet_by = NULL,
+  facet_ncol = NULL,
+  facet_scales = "fixed",
+  show_IC50 = FALSE,
   save_plot = NULL,
   plot_width = 12,
   plot_height = 8,
@@ -31,195 +36,128 @@ plot_drc_batch(
 )
 }
 \arguments{
-\item{batch_drc_results}{List containing batch DRC analysis results from
-\code{\link{batch_drc_analysis}}. Each element should contain a \code{drc_result}
-with \code{detailed_results}.}
+\item{batch_drc_results}{A named list containing the results of the DRC batch analysis.
+Structure expected: \code{list(plate_name = list(drc_result = list(detailed_results = ...)))}.}
 
-\item{target_compound}{Character string specifying which compound(s) to plot.
-Can be in several formats:
+\item{target_compound}{Character string. The specific target/compound to plot.
+Supports two formats:
 \itemize{
-\item \code{"target:compound"} - Exact target:compound pair (e.g., "MEK:PD0325901")
-\item \code{"target"} - All compounds for a specific target (e.g., "MEK")
-\item \code{"compound"} - All compounds with specific compound name (e.g., "PD0325901")
+\item \strong{"Target:Compound"}: Performs an exact match (e.g., "PAK3:IPA-3").
+\item \strong{"SearchString"}: Performs a fuzzy search across targets and compounds (e.g., "IPA-3").
 }
-Case-insensitive partial matching is supported.}
+Ignored if \code{position} is provided.}
 
-\item{position}{Integer specifying the position/index of the compound to plot.
-Useful for quickly plotting specific compounds without knowing their names.}
+\item{position}{Integer. Selects a compound by its numerical index in the list of unique results.
+Useful for iterating through compounds blindly.}
 
-\item{y_limits}{Numeric vector of length 2 specifying Y-axis limits (default: c(0, 150)).}
+\item{y_limits}{Numeric vector of length 2 (e.g., \code{c(0, 150)}). Sets the Y-axis limits.
+If \code{NULL} (default), limits are automatic.
+\emph{Note:} Ignored if \code{facet_scales} contains "free".}
 
-\item{colors}{Character vector of colors for plot elements. If NULL, default
-ggplot2 colors are used. Length should match the number of groups/duplicates.}
+\item{colors}{Character vector or string. Controls the line/point colors.
+\itemize{
+\item \strong{Manual}: A vector of color codes/names (e.g., \code{c("red", "blue")}).
+\item \strong{Scientific Palettes (ggsci)}: "npg", "aaas", "nejm", "lancet", "jama", "jco", "ucscgb", "d3".
+\item \strong{Perceptual Palettes (viridis)}: "viridis", "magma", "plasma", "inferno", "cividis", "turbo".
+\item \strong{RColorBrewer}: Names like "Set1", "Dark2", "Paired".
+}}
 
-\item{point_shapes}{Numeric vector of point shapes for duplicates (when
-\code{shape_by_duplicate = TRUE}). If NULL, default shapes are used.}
+\item{point_shapes}{Integer vector. Custom shapes for points (0-25). Used only if \code{shape_by_duplicate = TRUE}.}
 
-\item{show_error_bars}{Logical indicating whether to show error bars for
-data points (default: TRUE).}
+\item{show_error_bars}{Logical. If \code{TRUE} (default), adds error bars (mean +/- SD) to the points.}
 
-\item{legend_position}{Character specifying legend position. One of: "none",
-"left", "right", "bottom", "top" (default: "right").}
+\item{legend_position}{Character. Position of the legend ("right", "bottom", "top", "none").}
 
-\item{show_legend}{Logical indicating whether to show the legend (default: TRUE).}
+\item{show_legend}{Logical. Whether to display the legend.}
 
-\item{shape_by_duplicate}{Logical indicating whether to use different point
-shapes for different duplicates (in addition to colors). Only applies when
-plotting a single compound across multiple plates (default: FALSE).}
+\item{shape_by_duplicate}{Logical. If \code{TRUE} and plotting a single compound group,
+different replicates (plates) will have different point shapes.}
 
-\item{show_grid}{Logical indicating whether to show plot grid lines (default: FALSE).}
+\item{show_grid}{Logical. If \code{TRUE}, displays grid lines. If \code{FALSE} (default),
+produces a clean "classic" scientific style (axis lines only).}
 
-\item{save_plot}{Character string specifying file path to save the plot.
-If NULL, plot is displayed but not saved. Supported formats include
-.png, .pdf, .jpg, .tiff.}
+\item{font_family}{Character. Font family for text elements.
+Common options: "sans" (Arial/Helvetica), "serif" (Times New Roman), "mono" (Courier).
+For custom fonts, use the \code{extrafont} package.}
 
-\item{plot_width}{Numeric specifying plot width in inches (default: 12).}
+\item{facet_by}{Character. Variable to split the plot into panels.
+Options: \code{"compound"}, \code{"target"}, \code{"plate"}. Default is \code{NULL} (single plot).}
 
-\item{plot_height}{Numeric specifying plot height in inches (default: 8).}
+\item{facet_ncol}{Integer. Number of columns for the faceted grid.}
 
-\item{plot_dpi}{Numeric specifying plot resolution in dots per inch (default: 600).}
+\item{facet_scales}{Character. Scaling of axes in facets.
+Options: \code{"fixed"} (default), \code{"free"}, \code{"free_y"}, \code{"free_x"}.}
 
-\item{plot_title}{Character string for custom plot title. If NULL, an
-intelligent title is generated based on the selected compounds.}
+\item{show_IC50}{Logical. If \code{TRUE}, extracts the IC50/EC50 from the model and displays it
+in the plot legend. Also prints a summary table to the console.}
 
-\item{legend_title}{Character string for custom legend title. If NULL,
-an appropriate title is generated automatically.}
+\item{save_plot}{Character string. File path to save the plot (e.g., "plot.png", "plot.pdf").
+If \code{NULL}, the plot is not saved automatically.}
 
-\item{y_axis_title}{Character string for custom Y-axis title. If NULL,
-title is set based on normalization status.}
+\item{plot_width}{Numeric. Width of the saved plot in inches.}
 
-\item{verbose}{Logical indicating whether to print progress messages (default: TRUE).}
+\item{plot_height}{Numeric. Height of the saved plot in inches.}
 
-\item{axis_text_color}{Character specifying axis text color (default: "black").}
+\item{plot_dpi}{Integer. Resolution of the saved plot (default: 600).}
 
-\item{axis_text_size}{Numeric specifying axis text size (default: 12).}
+\item{plot_title}{Character. Custom main title. If \code{NULL}, generates a smart title based on selection.}
 
-\item{axis_title_color}{Character specifying axis title color (default: "black").}
+\item{legend_title}{Character. Custom legend title.}
 
-\item{axis_title_size}{Numeric specifying axis title size (default: 14).}
+\item{y_axis_title}{Character. Custom Y-axis title. Default is "BRET ratio".}
+
+\item{verbose}{Logical. If \code{TRUE}, prints progress messages and IC50 tables to the console.}
+
+\item{axis_text_color}{Character. Color of axis tick labels.}
+
+\item{axis_text_size}{Numeric. Size of axis tick labels.}
+
+\item{axis_title_color}{Character. Color of axis titles.}
+
+\item{axis_title_size}{Numeric. Size of axis titles.}
 }
 \value{
-Returns a ggplot2 object containing the dose-response curve plot. The plot
-object has an additional "metadata" attribute containing:
-\itemize{
-\item \code{selected_groups}: Names of selected compound groups
-\item \code{n_groups}: Number of compound groups
-\item \code{n_plates}: Number of plates
-\item \code{unique_targets}: Unique target names
-\item \code{unique_compounds}: Unique compound names
-\item \code{match_type}: Type of match used for compound selection
-\item \code{input_used}: Input that produced the match
-\item \code{is_normalized}: Whether data was normalized
-\item \code{plot_title}: Final plot title used
-\item \code{y_axis_title}: Final Y-axis title used
-\item \code{duplicate_labels}: Ordered duplicate labels
-\item \code{shape_by_duplicate}: Whether shapes were used for duplicates
-\item \code{show_grid}: Whether grid was shown
-}
+A \code{ggplot2} object. This allows further modification using standard ggplot syntax
+(e.g., \code{plot + theme_dark()}).
 }
 \description{
-Creates publication-quality dose-response curve plots from batch DRC analysis results.
-The function supports plotting single or multiple compounds across different plates,
-with intelligent title generation, flexible formatting options, and automatic
-handling of experimental duplicates.
+This function generates publication-quality Dose-Response Curve (DRC) plots from a list of
+batch processing results. It handles data extraction, statistical aggregation, and visualization
+in a single step. It supports advanced features like scientific color palettes, faceting,
+automatic IC50/EC50 annotation, and custom styling.
 }
 \details{
-This function extracts compound information from batch DRC results and creates
-customizable dose-response curve plots. Key features include:
-\itemize{
-\item Intelligent compound selection using target:compound syntax or position
-\item Automatic generation of descriptive plot titles
-\item Support for experimental duplicates with automatic labeling
-\item Flexible color and shape customization
-\item Publication-quality formatting with configurable themes
-\item Option to differentiate duplicates by both colors and shapes
-\item Error bars for data points with standard deviation
-\item Multiple output formats and saving options
-}
+\strong{Data Extraction:} The function iterates through the nested list structure of \code{batch_drc_results},
+extracting raw data points and model predictions for valid fits.
 
-The function automatically detects the plotting strategy based on the number
-of selected compounds and plates:
-\itemize{
-\item \strong{Single compound, multiple plates}: Colors (and optionally shapes) represent different plates/duplicates
-\item \strong{Multiple compounds, single plate}: Colors represent different compounds
-\item \strong{Multiple compounds, multiple plates}: Colors represent compounds, grouping by plates
-}
-}
-\section{Intelligent Title Generation}{
+\strong{IC50 Extraction:} The function attempts to extract the IC50/EC50 parameter (usually 'e')
+from the underlying \code{drc} model object. This value is displayed in the console and optionally in the legend.
 
-The function automatically generates descriptive plot titles based on the
-selected compounds:
-\itemize{
-\item Single compound: Uses compound name
-\item Single target: Uses target name
-\item Multiple compounds with same target: Uses target name
-\item Multiple different compounds: "Multiple Compounds (n)"
-\item Custom title: Used if provided via \code{plot_title}
+\strong{Faceting vs. Limits:} If \code{facet_scales} is set to "free" or "free_y", the global \code{y_limits}
+argument will be ignored to allow each panel to scale independently.
 }
-}
-
-\section{Duplicate Handling}{
-
-Experimental plates are automatically labeled as "Duplicate 01", "Duplicate 02", etc.
-The function extracts plate numbers from plate names and orders them numerically.
-When \code{shape_by_duplicate = TRUE}, different point shapes are used in addition
-to colors to visually distinguish between duplicates.
-}
-
-\section{Error Bars}{
-
-Error bars show mean +- standard deviation for each concentration point.
-They are only displayed when replicate measurements are available and
-\code{show_error_bars = TRUE}.
-}
-
 \examples{
 \dontrun{
-# Load example batch DRC results
-data("example_batch_drc_results")
+# 1. Basic usage: Plot specific compound by name
+plot_drc_batch(results, target_compound = "PAK3:IPA-3")
 
-# Plot specific compound by target:compound syntax
-p1 <- plot_drc_batch(
-  batch_drc_results = example_batch_drc_results,
-  target_compound = "MEK:PD0325901"
-)
+# 2. Search fuzzy match and use JAMA colors
+plot_drc_batch(results, target_compound = "IPA-3", colors = "jama")
 
-# Plot with shapes to differentiate duplicates
-p2 <- plot_drc_batch(
-  batch_drc_results = example_batch_drc_results,
-  target_compound = "MEK:PD0325901",
-  shape_by_duplicate = TRUE
-)
+# 3. Plot by position (e.g., the 5th compound found)
+plot_drc_batch(results, position = 5)
 
-# Plot all compounds for a specific target
-p3 <- plot_drc_batch(
-  batch_drc_results = example_batch_drc_results,
-  target_compound = "MEK"
-)
+# 4. Facet by compound (compare multiple compounds side-by-side)
+plot_drc_batch(results,
+               target_compound = "PAK3",
+               facet_by = "compound",
+               facet_ncol = 3)
 
-# Plot with custom colors and save to file
-p4 <- plot_drc_batch(
-  batch_drc_results = example_batch_drc_results,
-  target_compound = "MEK:PD0325901",
-  colors = c("#E41A1C", "#377EB8", "#4DAF4A"),
-  save_plot = "drc_plot.png",
-  plot_width = 10,
-  plot_height = 6
-)
-
-# Plot with grid and custom theme
-p5 <- plot_drc_batch(
-  batch_drc_results = example_batch_drc_results,
-  target_compound = "MEK:PD0325901",
-  show_grid = TRUE,
-  axis_text_color = "darkblue",
-  axis_title_color = "darkred"
-)
-
-# Access plot metadata
-metadata <- attr(p1, "metadata")
-print(metadata$n_plates)
-print(metadata$unique_compounds)
+# 5. Show IC50 in legend and use Times New Roman
+plot_drc_batch(results,
+               target_compound = "TargetA:CompB",
+               show_IC50 = TRUE,
+               font_family = "serif")
 }
 
 }

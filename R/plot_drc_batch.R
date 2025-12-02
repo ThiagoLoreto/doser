@@ -1,166 +1,99 @@
-#' Plot Dose-Response Curves from Batch DRC Analysis
+#' Plot Dose-Response Curves (DRC) from Batch Analysis Results
 #'
 #' @description
-#' Creates publication-quality dose-response curve plots from batch DRC analysis results.
-#' The function supports plotting single or multiple compounds across different plates,
-#' with intelligent title generation, flexible formatting options, and automatic
-#' handling of experimental duplicates.
+#' This function generates publication-quality Dose-Response Curve (DRC) plots from a list of
+#' batch processing results. It handles data extraction, statistical aggregation, and visualization
+#' in a single step. It supports advanced features like scientific color palettes, faceting,
+#' automatic IC50/EC50 annotation, and custom styling.
+#'
+#' @param batch_drc_results A named list containing the results of the DRC batch analysis.
+#'   Structure expected: \code{list(plate_name = list(drc_result = list(detailed_results = ...)))}.
+#' @param target_compound Character string. The specific target/compound to plot.
+#'   Supports two formats:
+#'   \itemize{
+#'     \item \strong{"Target:Compound"}: Performs an exact match (e.g., "PAK3:IPA-3").
+#'     \item \strong{"SearchString"}: Performs a fuzzy search across targets and compounds (e.g., "IPA-3").
+#'   }
+#'   Ignored if \code{position} is provided.
+#' @param position Integer. Selects a compound by its numerical index in the list of unique results.
+#'   Useful for iterating through compounds blindly.
+#' @param y_limits Numeric vector of length 2 (e.g., \code{c(0, 150)}). Sets the Y-axis limits.
+#'   If \code{NULL} (default), limits are automatic.
+#'   \emph{Note:} Ignored if \code{facet_scales} contains "free".
+#' @param colors Character vector or string. Controls the line/point colors.
+#'   \itemize{
+#'     \item \strong{Manual}: A vector of color codes/names (e.g., \code{c("red", "blue")}).
+#'     \item \strong{Scientific Palettes (ggsci)}: "npg", "aaas", "nejm", "lancet", "jama", "jco", "ucscgb", "d3".
+#'     \item \strong{Perceptual Palettes (viridis)}: "viridis", "magma", "plasma", "inferno", "cividis", "turbo".
+#'     \item \strong{RColorBrewer}: Names like "Set1", "Dark2", "Paired".
+#'   }
+#' @param point_shapes Integer vector. Custom shapes for points (0-25). Used only if \code{shape_by_duplicate = TRUE}.
+#' @param show_error_bars Logical. If \code{TRUE} (default), adds error bars (mean +/- SD) to the points.
+#' @param legend_position Character. Position of the legend ("right", "bottom", "top", "none").
+#' @param show_legend Logical. Whether to display the legend.
+#' @param shape_by_duplicate Logical. If \code{TRUE} and plotting a single compound group,
+#'   different replicates (plates) will have different point shapes.
+#' @param show_grid Logical. If \code{TRUE}, displays grid lines. If \code{FALSE} (default),
+#'   produces a clean "classic" scientific style (axis lines only).
+#' @param font_family Character. Font family for text elements.
+#'   Common options: "sans" (Arial/Helvetica), "serif" (Times New Roman), "mono" (Courier).
+#'   For custom fonts, use the \code{extrafont} package.
+#' @param facet_by Character. Variable to split the plot into panels.
+#'   Options: \code{"compound"}, \code{"target"}, \code{"plate"}. Default is \code{NULL} (single plot).
+#' @param facet_ncol Integer. Number of columns for the faceted grid.
+#' @param facet_scales Character. Scaling of axes in facets.
+#'   Options: \code{"fixed"} (default), \code{"free"}, \code{"free_y"}, \code{"free_x"}.
+#' @param show_IC50 Logical. If \code{TRUE}, extracts the IC50/EC50 from the model and displays it
+#'   in the plot legend. Also prints a summary table to the console.
+#' @param save_plot Character string. File path to save the plot (e.g., "plot.png", "plot.pdf").
+#'   If \code{NULL}, the plot is not saved automatically.
+#' @param plot_width Numeric. Width of the saved plot in inches.
+#' @param plot_height Numeric. Height of the saved plot in inches.
+#' @param plot_dpi Integer. Resolution of the saved plot (default: 600).
+#' @param plot_title Character. Custom main title. If \code{NULL}, generates a smart title based on selection.
+#' @param legend_title Character. Custom legend title.
+#' @param y_axis_title Character. Custom Y-axis title. Default is "BRET ratio".
+#' @param verbose Logical. If \code{TRUE}, prints progress messages and IC50 tables to the console.
+#' @param axis_text_color Character. Color of axis tick labels.
+#' @param axis_text_size Numeric. Size of axis tick labels.
+#' @param axis_title_color Character. Color of axis titles.
+#' @param axis_title_size Numeric. Size of axis titles.
+#'
+#' @return A \code{ggplot2} object. This allows further modification using standard ggplot syntax
+#'   (e.g., \code{plot + theme_dark()}).
 #'
 #' @details
-#' This function extracts compound information from batch DRC results and creates
-#' customizable dose-response curve plots. Key features include:
-#' \itemize{
-#'   \item Intelligent compound selection using target:compound syntax or position
-#'   \item Automatic generation of descriptive plot titles
-#'   \item Support for experimental duplicates with automatic labeling
-#'   \item Flexible color and shape customization
-#'   \item Publication-quality formatting with configurable themes
-#'   \item Option to differentiate duplicates by both colors and shapes
-#'   \item Error bars for data points with standard deviation
-#'   \item Multiple output formats and saving options
-#' }
+#' \strong{Data Extraction:} The function iterates through the nested list structure of \code{batch_drc_results},
+#' extracting raw data points and model predictions for valid fits.
 #'
-#' The function automatically detects the plotting strategy based on the number
-#' of selected compounds and plates:
-#' \itemize{
-#'   \item **Single compound, multiple plates**: Colors (and optionally shapes) represent different plates/duplicates
-#'   \item **Multiple compounds, single plate**: Colors represent different compounds
-#'   \item **Multiple compounds, multiple plates**: Colors represent compounds, grouping by plates
-#' }
+#' \strong{IC50 Extraction:} The function attempts to extract the IC50/EC50 parameter (usually 'e')
+#' from the underlying \code{drc} model object. This value is displayed in the console and optionally in the legend.
 #'
-#' @param batch_drc_results List containing batch DRC analysis results from
-#'   \code{\link{batch_drc_analysis}}. Each element should contain a \code{drc_result}
-#'   with \code{detailed_results}.
-#' @param target_compound Character string specifying which compound(s) to plot.
-#'   Can be in several formats:
-#'   \itemize{
-#'     \item \code{"target:compound"} - Exact target:compound pair (e.g., "MEK:PD0325901")
-#'     \item \code{"target"} - All compounds for a specific target (e.g., "MEK")
-#'     \item \code{"compound"} - All compounds with specific compound name (e.g., "PD0325901")
-#'   }
-#'   Case-insensitive partial matching is supported.
-#' @param position Integer specifying the position/index of the compound to plot.
-#'   Useful for quickly plotting specific compounds without knowing their names.
-#' @param y_limits Numeric vector of length 2 specifying Y-axis limits (default: c(0, 150)).
-#' @param colors Character vector of colors for plot elements. If NULL, default
-#'   ggplot2 colors are used. Length should match the number of groups/duplicates.
-#' @param point_shapes Numeric vector of point shapes for duplicates (when
-#'   \code{shape_by_duplicate = TRUE}). If NULL, default shapes are used.
-#' @param show_error_bars Logical indicating whether to show error bars for
-#'   data points (default: TRUE).
-#' @param legend_position Character specifying legend position. One of: "none",
-#'   "left", "right", "bottom", "top" (default: "right").
-#' @param show_legend Logical indicating whether to show the legend (default: TRUE).
-#' @param shape_by_duplicate Logical indicating whether to use different point
-#'   shapes for different duplicates (in addition to colors). Only applies when
-#'   plotting a single compound across multiple plates (default: FALSE).
-#' @param show_grid Logical indicating whether to show plot grid lines (default: FALSE).
-#' @param save_plot Character string specifying file path to save the plot.
-#'   If NULL, plot is displayed but not saved. Supported formats include
-#'   .png, .pdf, .jpg, .tiff.
-#' @param plot_width Numeric specifying plot width in inches (default: 12).
-#' @param plot_height Numeric specifying plot height in inches (default: 8).
-#' @param plot_dpi Numeric specifying plot resolution in dots per inch (default: 600).
-#' @param plot_title Character string for custom plot title. If NULL, an
-#'   intelligent title is generated based on the selected compounds.
-#' @param legend_title Character string for custom legend title. If NULL,
-#'   an appropriate title is generated automatically.
-#' @param y_axis_title Character string for custom Y-axis title. If NULL,
-#'   title is set based on normalization status.
-#' @param verbose Logical indicating whether to print progress messages (default: TRUE).
-#' @param axis_text_color Character specifying axis text color (default: "black").
-#' @param axis_text_size Numeric specifying axis text size (default: 12).
-#' @param axis_title_color Character specifying axis title color (default: "black").
-#' @param axis_title_size Numeric specifying axis title size (default: 14).
-#'
-#' @return
-#' Returns a ggplot2 object containing the dose-response curve plot. The plot
-#' object has an additional "metadata" attribute containing:
-#' \itemize{
-#'   \item \code{selected_groups}: Names of selected compound groups
-#'   \item \code{n_groups}: Number of compound groups
-#'   \item \code{n_plates}: Number of plates
-#'   \item \code{unique_targets}: Unique target names
-#'   \item \code{unique_compounds}: Unique compound names
-#'   \item \code{match_type}: Type of match used for compound selection
-#'   \item \code{input_used}: Input that produced the match
-#'   \item \code{is_normalized}: Whether data was normalized
-#'   \item \code{plot_title}: Final plot title used
-#'   \item \code{y_axis_title}: Final Y-axis title used
-#'   \item \code{duplicate_labels}: Ordered duplicate labels
-#'   \item \code{shape_by_duplicate}: Whether shapes were used for duplicates
-#'   \item \code{show_grid}: Whether grid was shown
-#' }
-#'
-#' @section Intelligent Title Generation:
-#' The function automatically generates descriptive plot titles based on the
-#' selected compounds:
-#' \itemize{
-#'   \item Single compound: Uses compound name
-#'   \item Single target: Uses target name
-#'   \item Multiple compounds with same target: Uses target name
-#'   \item Multiple different compounds: "Multiple Compounds (n)"
-#'   \item Custom title: Used if provided via \code{plot_title}
-#' }
-#'
-#' @section Duplicate Handling:
-#' Experimental plates are automatically labeled as "Duplicate 01", "Duplicate 02", etc.
-#' The function extracts plate numbers from plate names and orders them numerically.
-#' When \code{shape_by_duplicate = TRUE}, different point shapes are used in addition
-#' to colors to visually distinguish between duplicates.
-#'
-#' @section Error Bars:
-#' Error bars show mean +- standard deviation for each concentration point.
-#' They are only displayed when replicate measurements are available and
-#' \code{show_error_bars = TRUE}.
+#' \strong{Faceting vs. Limits:} If \code{facet_scales} is set to "free" or "free_y", the global \code{y_limits}
+#' argument will be ignored to allow each panel to scale independently.
 #'
 #' @examples
 #' \dontrun{
-#' # Load example batch DRC results
-#' data("example_batch_drc_results")
+#' # 1. Basic usage: Plot specific compound by name
+#' plot_drc_batch(results, target_compound = "PAK3:IPA-3")
 #'
-#' # Plot specific compound by target:compound syntax
-#' p1 <- plot_drc_batch(
-#'   batch_drc_results = example_batch_drc_results,
-#'   target_compound = "MEK:PD0325901"
-#' )
+#' # 2. Search fuzzy match and use JAMA colors
+#' plot_drc_batch(results, target_compound = "IPA-3", colors = "jama")
 #'
-#' # Plot with shapes to differentiate duplicates
-#' p2 <- plot_drc_batch(
-#'   batch_drc_results = example_batch_drc_results,
-#'   target_compound = "MEK:PD0325901",
-#'   shape_by_duplicate = TRUE
-#' )
+#' # 3. Plot by position (e.g., the 5th compound found)
+#' plot_drc_batch(results, position = 5)
 #'
-#' # Plot all compounds for a specific target
-#' p3 <- plot_drc_batch(
-#'   batch_drc_results = example_batch_drc_results,
-#'   target_compound = "MEK"
-#' )
+#' # 4. Facet by compound (compare multiple compounds side-by-side)
+#' plot_drc_batch(results,
+#'                target_compound = "PAK3",
+#'                facet_by = "compound",
+#'                facet_ncol = 3)
 #'
-#' # Plot with custom colors and save to file
-#' p4 <- plot_drc_batch(
-#'   batch_drc_results = example_batch_drc_results,
-#'   target_compound = "MEK:PD0325901",
-#'   colors = c("#E41A1C", "#377EB8", "#4DAF4A"),
-#'   save_plot = "drc_plot.png",
-#'   plot_width = 10,
-#'   plot_height = 6
-#' )
-#'
-#' # Plot with grid and custom theme
-#' p5 <- plot_drc_batch(
-#'   batch_drc_results = example_batch_drc_results,
-#'   target_compound = "MEK:PD0325901",
-#'   show_grid = TRUE,
-#'   axis_text_color = "darkblue",
-#'   axis_title_color = "darkred"
-#' )
-#'
-#' # Access plot metadata
-#' metadata <- attr(p1, "metadata")
-#' print(metadata$n_plates)
-#' print(metadata$unique_compounds)
+#' # 5. Show IC50 in legend and use Times New Roman
+#' plot_drc_batch(results,
+#'                target_compound = "TargetA:CompB",
+#'                show_IC50 = TRUE,
+#'                font_family = "serif")
 #' }
 #'
 #' @seealso
@@ -169,750 +102,383 @@
 #' \code{\link[ggplot2]{ggplot}} for underlying plotting functionality
 #'
 #' @import ggplot2
+#' @import dplyr
+#' @import tidyr
+#' @import tibble
 #' @import scales
+#' @importFrom RColorBrewer brewer.pal
 #' @export
 
 
 
 plot_drc_batch <- function(batch_drc_results,
-                                     target_compound = NULL,
-                                     position = NULL,
-                                     y_limits = c(0, 150),
-                                     colors = NULL,
-                                     point_shapes = NULL,
-                                     show_error_bars = TRUE,
-                                     legend_position = "right",
-                                     show_legend = TRUE,
-                                     shape_by_duplicate = FALSE,
-                                     show_grid = FALSE,
-                                     save_plot = NULL,
-                                     plot_width = 12,
-                                     plot_height = 8,
-                                     plot_dpi = 600,
-                                     plot_title = NULL,
-                                     legend_title = NULL,
-                                     y_axis_title = NULL,
-                                     verbose = TRUE,
-                                     axis_text_color = "black",
-                                     axis_text_size = 12,
-                                     axis_title_color = "black",
-                                     axis_title_size = 14) {
-  
+                           target_compound = NULL,
+                           position = NULL,
+                           y_limits = NULL,
+                           colors = NULL,
+                           point_shapes = NULL,
+                           show_error_bars = TRUE,
+                           legend_position = "right",
+                           show_legend = TRUE,
+                           shape_by_duplicate = FALSE,
+                           show_grid = FALSE,
+                           font_family = "sans",
+                           # --- Facet Arguments ---
+                           facet_by = NULL,      # Options: "compound", "target", "plate", or NULL
+                           facet_ncol = NULL,
+                           facet_scales = "fixed",
+                           # --- IC50 Annotation ---
+                           show_IC50 = FALSE,    # If TRUE, adds values to the legend
+                           # -----------------------
+                           save_plot = NULL,
+                           plot_width = 12,
+                           plot_height = 8,
+                           plot_dpi = 600,
+                           plot_title = NULL,
+                           legend_title = NULL,
+                           y_axis_title = NULL,
+                           verbose = TRUE,
+                           axis_text_color = "black",
+                           axis_text_size = 12,
+                           axis_title_color = "black",
+                           axis_title_size = 14) {
+
   # ============================================================================
-  # 1. DEPENDENCY CHECK AND INITIAL VALIDATION
+  # 1. DEPENDENCY CHECK
   # ============================================================================
-  
-  # Check required packages
-  required_packages <- c("ggplot2", "scales")
+  required_packages <- c("ggplot2", "scales", "dplyr", "tidyr", "tibble")
   missing_packages <- sapply(required_packages, function(pkg) {
     !requireNamespace(pkg, quietly = TRUE)
   })
-  
+
   if (any(missing_packages)) {
-    stop("The following packages are required: ", 
-         paste(required_packages[missing_packages], collapse = ", "))
+    stop("The following packages are required: ", paste(required_packages[missing_packages], collapse = ", "))
   }
-  
-  # Load packages
-  library(ggplot2)
-  library(scales)
-  
-  # Validate input
-  if (length(batch_drc_results) == 0) {
-    stop("Batch DRC results list is empty")
-  }
-  
-  if (verbose) {
-    message("Processing DRC batch results for plotting...")
-    message("Number of plates: ", length(batch_drc_results))
-  }
-  
+
+  suppressPackageStartupMessages({
+    library(ggplot2); library(scales); library(dplyr); library(tidyr); library(tibble)
+  })
+
+  if (length(batch_drc_results) == 0) stop("The DRC results list is empty.")
+  if (verbose) message("Processing DRC batch results...")
+
   # ============================================================================
   # 2. HELPER FUNCTIONS
   # ============================================================================
-  
-  # Detect input type (target:compound format or single entry)
-  detect_input_type <- function(input) {
-    if (is.null(input)) return("none")
-    if (grepl(":", input)) {
-      parts <- strsplit(input, ":")[[1]]
-      if (length(parts) == 2 && nchar(parts[1]) > 0 && nchar(parts[2]) > 0) {
-        return("both")
-      }
+
+  # Cleans compound names and handles "Target:Compound" format
+  parse_compound_name <- function(name) {
+    clean_name <- trimws(gsub("\\.\\d+$", "", name)) # Remove suffix like .2 or .10
+
+    if (grepl(" \\| ", clean_name)) {
+      parts <- strsplit(clean_name, " \\| ")[[1]]
+      clean_name <- parts[1]
     }
-    return("unknown")
+
+    if (grepl(":", clean_name)) {
+      parts <- strsplit(clean_name, ":")[[1]]
+      return(list(target = trimws(parts[1]), compound = if(length(parts)>1) trimws(parts[2]) else trimws(parts[1])))
+    } else {
+      return(list(target = clean_name, compound = clean_name))
+    }
   }
-  
-  # Search for matches in index lists (exact or partial)
-  find_matches <- function(pattern, index_list, exact_first = TRUE) {
-    # Exact match
-    if (exact_first && pattern %in% names(index_list)) {
-      return(list(matches = index_list[[pattern]], type = "exact"))
+
+  # Generates color palettes (supports viridis, ggsci, RColorBrewer, or manual vectors)
+  generate_palette <- function(user_input, n_needed) {
+    if (is.null(user_input)) return(scales::hue_pal()(n_needed))
+    if (length(user_input) > 1) return(rep(user_input, length.out = n_needed))
+
+    pal_name <- tolower(user_input)
+
+    # Viridis options
+    if (pal_name %in% c("viridis", "magma", "plasma", "inferno", "cividis", "turbo")) {
+      if (requireNamespace("viridis", quietly = TRUE)) return(viridis::viridis_pal(option = pal_name)(n_needed))
     }
-    
-    # Partial match (case-insensitive)
-    matches_idx <- grepl(pattern, names(index_list), ignore.case = TRUE)
-    if (any(matches_idx)) {
-      matching_items <- unlist(index_list[matches_idx], recursive = FALSE)
-      return(list(matches = matching_items, type = "partial"))
-    }
-    
-    return(NULL)
-  }
-  
-  # ============================================================================
-  # 3. EXTRACT COMPOUND INFORMATION FROM ALL PLATES
-  # ============================================================================
-  
-  extract_all_compounds_info <- function(batch_drc_results) {
-    all_compounds <- list()
-    
-    for (plate_name in names(batch_drc_results)) {
-      plate_result <- batch_drc_results[[plate_name]]$drc_result$detailed_results
-      
-      if (verbose && length(plate_result) > 0) {
-        message("  Extracting compounds from plate: ", plate_name)
-      }
-      
-      for (i in seq_along(plate_result)) {
-        result <- plate_result[[i]]
-        
-        # Skip failed fits
-        if (is.null(result$model) || !isTRUE(result$success)) next
-        
-        # Extract and parse compound name
-        compound_name <- result$compound
-        
-        # Parse name format (target:compound | target:compound.2)
-        if (grepl(" \\| ", compound_name)) {
-          main_part <- strsplit(compound_name, " \\| ")[[1]][1]
-          name_parts <- strsplit(main_part, ":")[[1]]
-          target <- ifelse(length(name_parts) >= 1, name_parts[1], main_part)
-          compound <- ifelse(length(name_parts) >= 2, name_parts[2], target)
-        } else if (grepl(":", compound_name)) {
-          name_parts <- strsplit(compound_name, ":")[[1]]
-          target <- name_parts[1]
-          compound <- ifelse(length(name_parts) > 1, name_parts[2], target)
-        } else {
-          target <- compound_name
-          compound <- compound_name
-        }
-        
-        # Clean names (remove .2 suffix)
-        target_clean <- trimws(gsub("\\.2$", "", target))
-        compound_clean <- trimws(gsub("\\.2$", "", compound))
-        
-        # Get experimental data
-        data <- result$data
-        if (is.null(data)) next
-        
-        valid_data <- data[is.finite(data$log_inhibitor) & is.finite(data$response), ]
-        if (nrow(valid_data) < 2) next
-        
+
+    # Scientific journals (ggsci)
+    ggsci_map <- list("npg"="pal_npg", "aaas"="pal_aaas", "nejm"="pal_nejm", "lancet"="pal_lancet", "jama"="pal_jama", "jamma"="pal_jama", "jco"="pal_jco", "ucscgb"="pal_ucscgb", "d3"="pal_d3")
+    if (pal_name %in% names(ggsci_map)) {
+      if (requireNamespace("ggsci", quietly = TRUE)) {
+        pal_func <- get(ggsci_map[[pal_name]], asNamespace("ggsci"))
         tryCatch({
-          # Generate fitted curve points
+          base <- pal_func()(n_needed)
+          if(length(base) < n_needed) return(colorRampPalette(base)(n_needed)) else return(base[1:n_needed])
+        }, error = function(e) { return(colorRampPalette(pal_func()(10))(n_needed)) })
+      }
+    }
+
+    # RColorBrewer
+    if (requireNamespace("RColorBrewer", quietly = TRUE)) {
+      brewer_pals <- rownames(RColorBrewer::brewer.pal.info)
+      match_idx <- which(tolower(brewer_pals) == pal_name)
+      if (length(match_idx) > 0) {
+        real_name <- brewer_pals[match_idx[1]]; max_n <- RColorBrewer::brewer.pal.info[real_name, "maxcolors"]
+        base <- RColorBrewer::brewer.pal(min(max(n_needed, 3), max_n), real_name)
+        if (n_needed > max_n) return(colorRampPalette(base)(n_needed)) else return(base[1:n_needed])
+      }
+    }
+
+    # Fallback to manual single color repeated
+    return(rep(user_input, length.out = n_needed))
+  }
+
+  # ============================================================================
+  # 3. DATA & IC50 EXTRACTION
+  # ============================================================================
+  raw_data_list <- list(); curve_data_list <- list(); ec50_lookup_list <- list(); counter <- 0
+
+  for (plate_name in names(batch_drc_results)) {
+    plate_res <- batch_drc_results[[plate_name]]$drc_result$detailed_results
+
+    for (i in seq_along(plate_res)) {
+      res <- plate_res[[i]]
+      if (is.null(res$model) || !isTRUE(res$success) || is.null(res$data)) next
+
+      info <- parse_compound_name(res$compound)
+      tc_key <- paste(info$target, info$compound, sep = ":")
+      unique_id <- paste(plate_name, i, sep = "_")
+      counter <- counter + 1
+
+      # Extract IC50/EC50 from model coefficients
+      ic50_val <- NA
+      try({
+        coefs <- coef(res$model)
+        # Look for parameter 'e' (standard for log-logistic models)
+        e_params <- coefs[grep(":(e|ED50)", names(coefs))]
+        if (length(e_params) > 0) {
+          ic50_val <- as.numeric(e_params[1])
+        } else if (!is.null(res$ec50)) {
+          ic50_val <- res$ec50
+        }
+      }, silent = TRUE)
+
+      ec50_lookup_list[[counter]] <- data.frame(
+        unique_id = unique_id, ic50 = ic50_val, plate = plate_name,
+        compound = info$compound, stringsAsFactors = FALSE
+      )
+
+      valid_data <- res$data %>%
+        filter(is.finite(log_inhibitor) & is.finite(response)) %>%
+        mutate(plate = plate_name, target = info$target, compound = info$compound, target_compound = tc_key, unique_id = unique_id)
+
+      if (nrow(valid_data) >= 2) {
+        raw_data_list[[counter]] <- valid_data
+
+        # Generate curve points based on model prediction
+        try({
           x_range <- range(valid_data$log_inhibitor, na.rm = TRUE)
           x_seq <- seq(x_range[1], x_range[2], length.out = 100)
-          predicted <- predict(result$model, newdata = data.frame(log_inhibitor = x_seq))
-          
-          curve_data <- data.frame(
-            log_inhibitor = x_seq,
-            response = predicted,
-            plate = plate_name,
-            target = target_clean,
-            compound = compound_clean,
-            target_compound = paste(target_clean, compound_clean, sep = ":"),
-            original_index = i
+          pred_y <- predict(res$model, newdata = data.frame(log_inhibitor = x_seq))
+
+          curve_data_list[[counter]] <- data.frame(
+            log_inhibitor = x_seq, response = pred_y, plate = plate_name,
+            target = info$target, compound = info$compound, target_compound = tc_key, unique_id = unique_id
           )
-          
-          # Calculate point statistics (mean, SD, n)
-          conc_levels <- unique(valid_data$log_inhibitor)
-          point_stats <- do.call(rbind, lapply(conc_levels, function(conc) {
-            conc_data <- valid_data[valid_data$log_inhibitor == conc, ]
-            if (nrow(conc_data) > 0) {
-              data.frame(
-                log_inhibitor = conc,
-                mean_response = mean(conc_data$response, na.rm = TRUE),
-                sd_response = sd(conc_data$response, na.rm = TRUE),
-                n_points = nrow(conc_data),
-                plate = plate_name,
-                target = target_clean,
-                compound = compound_clean,
-                target_compound = paste(target_clean, compound_clean, sep = ":"),
-                original_index = i
-              )
-            }
-          }))
-          
-          # Store compound information
-          compound_info <- list(
-            curve_data = curve_data,
-            point_data = if (!is.null(point_stats) && nrow(point_stats) > 0) point_stats else data.frame(),
-            target = target_clean,
-            compound = compound_clean,
-            target_compound = paste(target_clean, compound_clean, sep = ":"),
-            plate = plate_name
-          )
-          
-          key <- paste(target_clean, compound_clean, plate_name, i, sep = "_")
-          all_compounds[[key]] <- compound_info
-          
-        }, error = function(e) {
-          if (verbose) message("    Error processing compound: ", e$message)
-        })
+        }, silent = TRUE)
       }
     }
-    
-    return(all_compounds)
   }
-  
-  # Extract all compounds from batch results
-  all_compounds <- extract_all_compounds_info(batch_drc_results)
-  
-  if (length(all_compounds) == 0) {
-    stop("No compounds with valid data found in batch results")
-  }
-  
-  if (verbose) {
-    message("Total valid compounds extracted: ", length(all_compounds))
-  }
-  
+
+  if (length(raw_data_list) == 0) stop("No valid data found in batch results.")
+
+  df_raw_master <- bind_rows(raw_data_list)
+  df_curve_master <- bind_rows(curve_data_list)
+  df_ec50_master <- bind_rows(ec50_lookup_list)
+
   # ============================================================================
-  # 4. CREATE SEARCH INDEX FOR COMPOUNDS
+  # 4. FILTERING LOGIC
   # ============================================================================
-  
-  create_search_index <- function(all_compounds) {
-    index <- list(by_target = list(), by_compound = list(), by_target_compound = list())
-    
-    for (key in names(all_compounds)) {
-      info <- all_compounds[[key]]
-      
-      # Index by target
-      if (!info$target %in% names(index$by_target)) {
-        index$by_target[[info$target]] <- list()
-      }
-      index$by_target[[info$target]][[key]] <- info
-      
-      # Index by compound
-      if (!info$compound %in% names(index$by_compound)) {
-        index$by_compound[[info$compound]] <- list()
-      }
-      index$by_compound[[info$compound]][[key]] <- info
-      
-      # Index by target:compound
-      tc <- info$target_compound
-      if (!tc %in% names(index$by_target_compound)) {
-        index$by_target_compound[[tc]] <- list()
-      }
-      index$by_target_compound[[tc]][[key]] <- info
-    }
-    
-    return(index)
-  }
-  
-  search_index <- create_search_index(all_compounds)
-  
-  if (verbose) {
-    message("Search index created:")
-    message("  Unique targets: ", length(search_index$by_target))
-    message("  Unique compounds: ", length(search_index$by_compound))
-    message("  Unique target:compound pairs: ", length(search_index$by_target_compound))
-  }
-  
-  # ============================================================================
-  # 5. SELECT COMPOUNDS BASED ON USER CRITERIA
-  # ============================================================================
-  
-  selected_compounds <- list()
-  match_type <- "unknown"
-  input_used <- NULL
-  
-  # Selection by position
+  unique_combinations <- df_raw_master %>% select(target_compound, target, compound, unique_id) %>% distinct()
+  selected_ids <- NULL; match_desc <- ""
+
   if (!is.null(position)) {
-    if (position > length(all_compounds)) {
-      stop("Position ", position, " is out of range. Only ", length(all_compounds), " compounds available.")
+    # Select by index position
+    unique_tc <- unique(unique_combinations$target_compound)
+    if (position > length(unique_tc)) stop("Invalid position index.")
+    target_tc <- unique_tc[position]
+    selected_ids <- unique_combinations %>% filter(target_compound == target_tc) %>% pull(unique_id)
+    match_desc <- paste("Pos:", position)
+
+  } else if (!is.null(target_compound)) {
+    # Select by name string
+    search_term <- target_compound; matches <- NULL
+
+    if (grepl(":", search_term)) {
+      # Specific Target:Compound match
+      parts <- strsplit(search_term, ":")[[1]]
+      target_query <- trimws(parts[1]); compound_query <- if(length(parts) > 1) trimws(parts[2]) else ""
+      matches <- unique_combinations %>% filter(target == target_query, compound == compound_query)
+
+      # Fallback to case-insensitive match
+      if (nrow(matches) == 0) {
+        matches <- unique_combinations %>%
+          filter(tolower(target) == tolower(target_query), tolower(compound) == tolower(compound_query))
+      }
+    } else {
+      # General fuzzy search
+      matches <- unique_combinations %>%
+        filter(grepl(search_term, compound, ignore.case=TRUE) | grepl(search_term, target, ignore.case=TRUE))
     }
-    selected_key <- names(all_compounds)[position]
-    selected_compounds[[selected_key]] <- all_compounds[[selected_key]]
-    match_type <- "position"
-    input_used <- paste("Position", position)
-    
-    if (verbose) {
-      info <- all_compounds[[selected_key]]
-      message("Selected by position ", position, ": ", info$target_compound, " (plate: ", info$plate, ")")
-    }
-  } 
-  # Selection by target_compound
-  else if (!is.null(target_compound)) {
-    input_type <- detect_input_type(target_compound)
-    input_used <- target_compound
-    
-    if (verbose) message("Input '", target_compound, "' detected as type: ", input_type)
-    
-    if (input_type == "both") {
-      # Search for target:compound
-      result <- find_matches(target_compound, search_index$by_target_compound)
-      if (!is.null(result)) {
-        selected_compounds <- result$matches
-        match_type <- ifelse(result$type == "exact", "target_compound", "target_compound_partial")
+
+    if (nrow(matches) == 0) stop("No match found for: ", search_term)
+    selected_ids <- matches$unique_id; match_desc <- search_term
+
+  } else {
+    # Default: Select first available
+    first_tc <- unique_combinations$target_compound[1]
+    selected_ids <- unique_combinations %>% filter(target_compound == first_tc) %>% pull(unique_id)
+    match_desc <- "First compound"
+  }
+
+  plot_raw <- df_raw_master %>% filter(unique_id %in% selected_ids)
+  plot_curve <- df_curve_master %>% filter(unique_id %in% selected_ids)
+  selected_ec50s <- df_ec50_master %>% filter(unique_id %in% selected_ids)
+
+  # Print IC50 summary to console
+  if (verbose && nrow(selected_ec50s) > 0) {
+    message("\n--- IC50/EC50 Values Summary ---")
+    print_table <- selected_ec50s %>%
+      select(plate, compound, ic50) %>%
+      mutate(ic50_formatted = sprintf("%.3e", ic50))
+    print(print_table)
+    message("--------------------------------\n")
+  }
+
+  # ============================================================================
+  # 5. DATA AGGREGATION & LEGEND SETUP
+  # ============================================================================
+  plot_stats <- plot_raw %>%
+    group_by(plate, target, compound, target_compound, unique_id, log_inhibitor) %>%
+    summarise(mean_response = mean(response, na.rm=T), sd_response = sd(response, na.rm=T), .groups="drop")
+
+  n_groups <- length(unique(plot_raw$target_compound))
+
+  # Sort plates numerically if possible
+  plate_levels <- unique(plot_raw$plate)
+  nums <- as.numeric(gsub("\\D", "", plate_levels))
+  if (!any(is.na(nums))) plate_levels <- plate_levels[order(nums)] else plate_levels <- sort(plate_levels)
+
+  # Helper to create plotting columns and inject IC50 into legend
+  create_cols <- function(df) {
+    df <- df %>% left_join(selected_ec50s %>% select(unique_id, ic50), by = "unique_id")
+
+    df %>% mutate(
+      plate = factor(plate, levels = plate_levels),
+      dup_lbl = ifelse(grepl("\\d", plate), paste("Duplicate", gsub("\\D", "", plate)), as.character(plate)),
+
+      base_label = if(n_groups > 1) target_compound else dup_lbl,
+
+      # Inject IC50 if requested
+      legend_group = if(show_IC50) {
+        ifelse(!is.na(ic50),
+               paste0(base_label, "\n(IC50: ", sprintf("%.2e", ic50), " M)"),
+               base_label)
       } else {
-        # Separate and search individually
-        parts <- strsplit(target_compound, ":")[[1]]
-        target_part <- parts[1]
-        compound_part <- ifelse(length(parts) > 1, parts[2], "")
-        
-        # Try target
-        result <- find_matches(target_part, search_index$by_target)
-        if (!is.null(result)) {
-          selected_compounds <- result$matches
-          match_type <- ifelse(result$type == "exact", "target", "target_partial")
-          input_used <- target_part
-        } 
-        # Try compound
-        else if (compound_part != "") {
-          result <- find_matches(compound_part, search_index$by_compound)
-          if (!is.null(result)) {
-            selected_compounds <- result$matches
-            match_type <- ifelse(result$type == "exact", "compound", "compound_partial")
-            input_used <- compound_part
-          }
-        }
-      }
-    } 
-    else {
-      # Search first as compound, then as target
-      result <- find_matches(target_compound, search_index$by_compound)
-      if (!is.null(result)) {
-        selected_compounds <- result$matches
-        match_type <- ifelse(result$type == "exact", "compound", "compound_partial")
-      } else {
-        result <- find_matches(target_compound, search_index$by_target)
-        if (!is.null(result)) {
-          selected_compounds <- result$matches
-          match_type <- ifelse(result$type == "exact", "target", "target_partial")
-        }
-      }
-    }
-    
-    if (length(selected_compounds) == 0) {
-      stop("No match found for '", target_compound, "'.")
-    }
-  } 
-  # No criteria provided - use first compound
-  else {
-    if (verbose) message("No selection criteria provided. Using first compound.")
-    first_key <- names(all_compounds)[1]
-    selected_compounds[[first_key]] <- all_compounds[[first_key]]
-    match_type <- "first"
-  }
-  
-  if (length(selected_compounds) == 0) {
-    stop("No compounds selected for plotting.")
-  }
-  
-  if (verbose) {
-    message("Selected ", length(selected_compounds), " compounds (match type: ", match_type, ")")
-    message("Show grid: ", show_grid)
-  }
-  
-  # ============================================================================
-  # 6. GROUP COMPOUNDS FOR PLOTTING
-  # ============================================================================
-  
-  selected_groups <- list()
-  for (key in names(selected_compounds)) {
-    info <- selected_compounds[[key]]
-    group_key <- info$target_compound
-    
-    if (!group_key %in% names(selected_groups)) {
-      selected_groups[[group_key]] <- list()
-    }
-    selected_groups[[group_key]][[info$plate]] <- info
-  }
-  
-  n_groups <- length(selected_groups)
-  
-  # ============================================================================
-  # 7. PREPARE PLOT DATA
-  # ============================================================================
-  
-  prepare_plot_data <- function(selected_groups) {
-    process_compound_data <- function(group_key, plate_name, compound_info) {
-      # Create duplicate label (e.g., "Duplicate 01", "Duplicate 02")
-      plate_num <- gsub(".*?([0-9]+).*", "\\1", plate_name)
-      duplicate_label <- if (grepl("^[0-9]+$", plate_num)) {
-        paste("Duplicate", sprintf("%02d", as.numeric(plate_num)))
-      } else {
-        paste("Duplicate", plate_name)
-      }
-      
-      plot_group <- paste(group_key, plate_name, sep = "_")
-      
-      # Process curve data
-      curve_df <- compound_info$curve_data
-      curve_df$group_key <- group_key
-      curve_df$plate <- plate_name
-      curve_df$duplicate_label <- duplicate_label
-      curve_df$plot_group <- plot_group
-      
-      # Process point data
-      point_df <- compound_info$point_data
-      if (nrow(point_df) > 0) {
-        point_df$group_key <- group_key
-        point_df$plate <- plate_name
-        point_df$duplicate_label <- duplicate_label
-        point_df$plot_group <- plot_group
-      }
-      
-      return(list(curves = curve_df, points = point_df))
-    }
-    
-    all_curves <- list()
-    all_points <- list()
-    
-    for (group_key in names(selected_groups)) {
-      for (plate_name in names(selected_groups[[group_key]])) {
-        compound_info <- selected_groups[[group_key]][[plate_name]]
-        processed <- process_compound_data(group_key, plate_name, compound_info)
-        
-        all_curves[[length(all_curves) + 1]] <- processed$curves
-        if (nrow(processed$points) > 0) {
-          all_points[[length(all_points) + 1]] <- processed$points
-        }
-      }
-    }
-    
-    if (length(all_curves) == 0) {
-      stop("No curve data available for plotting")
-    }
-    
-    list(
-      curves = do.call(rbind, all_curves),
-      points = if (length(all_points) > 0) do.call(rbind, all_points) else data.frame()
+        base_label
+      },
+      legend_group = factor(legend_group)
     )
   }
-  
-  plot_data <- prepare_plot_data(selected_groups)
-  n_plates <- length(unique(plot_data$curves$plate))
-  
+
+  plot_curve <- create_cols(plot_curve)
+  plot_stats <- create_cols(plot_stats)
+
   # ============================================================================
-  # 8. ANALYZE DATA FOR TITLE AND LEGEND GENERATION
+  # 6. VISUAL CONFIGURATION
   # ============================================================================
-  
-  unique_targets <- unique(sapply(selected_compounds, function(x) x$target))
-  unique_compounds <- unique(sapply(selected_compounds, function(x) x$compound))
-  
-  if (verbose) {
-    message("Analysis for title generation:")
-    message("  Unique targets: ", paste(unique_targets, collapse = ", "))
-    message("  Unique compounds: ", paste(unique_compounds, collapse = ", "))
-    message("  Match type: ", match_type)
-    message("  Input used: ", ifelse(is.null(input_used), "None", input_used))
-    message("  Shape by duplicate: ", shape_by_duplicate)
-    message("Plot data prepared: ", nrow(plot_data$curves), " curve points")
-    if (nrow(plot_data$points) > 0) {
-      message("  and ", nrow(plot_data$points), " data points")
-    }
-  }
-  
-  # Check if data was normalized
-  is_normalized <- FALSE
-  if (length(batch_drc_results) > 0) {
-    first_plate <- names(batch_drc_results)[1]
-    if (!is.null(batch_drc_results[[first_plate]]$drc_result$normalized)) {
-      is_normalized <- batch_drc_results[[first_plate]]$drc_result$normalized
-    }
-  }
-  
-  if (verbose) {
-    message("Data normalization status: ", ifelse(is_normalized, "Normalized", "Not normalized"))
-  }
-  
-  # Set Y axis title
-  y_axis_title_final <- if (is.null(y_axis_title)) {
-    ifelse(is_normalized, "Normalized BRET ratio [%]", "BRET ratio")
-  } else {
-    y_axis_title
-  }
-  
-  # ============================================================================
-  # 9. GENERATE INTELLIGENT PLOT TITLE
-  # ============================================================================
-  
-  generate_intelligent_title <- function(match_type, input_used, unique_targets, unique_compounds, n_groups) {
-    
-    # Custom title provided by user
-    if (!is.null(plot_title)) {
-      if (verbose) message("Using custom plot title: ", plot_title)
-      return(plot_title)
-    }
-    
-    # Single compound (all have same compound name)
-    if (length(unique_compounds) == 1 && unique_compounds[1] != "") {
-      title <- unique_compounds[1]
-      if (verbose) message("Title strategy: Single compound -> ", title)
-    }
-    # Single target (all have same target name)
-    else if (length(unique_targets) == 1 && unique_targets[1] != "") {
-      title <- unique_targets[1]
-      if (verbose) message("Title strategy: Single target -> ", title)
-    }
-    # Based on match type
-    else if (match_type %in% c("compound", "compound_partial")) {
-      title <- input_used
-      if (verbose) message("Title strategy: Matched by compound -> ", title)
-    }
-    else if (match_type %in% c("target", "target_partial")) {
-      title <- input_used
-      if (verbose) message("Title strategy: Matched by target -> ", title)
-    }
-    else if (match_type == "target_compound") {
-      # Extract only compound from target:compound format
-      if (grepl(":", input_used)) {
-        parts <- strsplit(input_used, ":")[[1]]
-        if (length(parts) >= 2) {
-          title <- parts[2]  # Use only compound name
-        } else {
-          title <- input_used
-        }
-      } else {
-        title <- input_used
-      }
-      if (verbose) message("Title strategy: Matched by target:compound -> ", title)
-    }
-    # Default descriptive title
-    else {
-      if (n_groups > 1) {
-        title <- paste("Multiple Compounds (", n_groups, ")", sep = "")
-      } else {
-        title <- "Dose-Response Curve"
-      }
-      if (verbose) message("Title strategy: Default -> ", title)
-    }
-    
-    return(title)
-  }
-  
-  plot_title_final <- generate_intelligent_title(match_type, input_used, unique_targets, 
-                                                 unique_compounds, n_groups)
-  
-  # ============================================================================
-  # 10. SET LEGEND TITLE AND ORDER DUPLICATES
-  # ============================================================================
-  
-  # Set legend title
-  if (is.null(legend_title)) {
-    legend_title_final <- if (n_groups == 1 && n_plates > 1) {
-      "Duplicate"
-    } else if (n_groups > 1 && n_plates == 1) {
-      "Compound"
-    } else if (n_groups > 1 && n_plates > 1) {
-      "Group"
-    } else {
-      ifelse(length(unique_compounds) == 1, "Compound", "Target")
-    }
-  } else {
-    legend_title_final <- legend_title
-  }
-  
-  # Order duplicates numerically
-  get_duplicate_number <- function(label) {
-    num <- gsub(".*?([0-9]+).*", "\\1", label)
-    ifelse(grepl("^[0-9]+$", num), as.numeric(num), 999)
-  }
-  
-  unique_duplicates <- unique(plot_data$curves$duplicate_label)
-  sorted_duplicates <- unique_duplicates[order(sapply(unique_duplicates, get_duplicate_number))]
-  
-  # Convert to factor to maintain order
-  plot_data$curves$duplicate_label <- factor(plot_data$curves$duplicate_label, levels = sorted_duplicates)
-  if (nrow(plot_data$points) > 0) {
-    plot_data$points$duplicate_label <- factor(plot_data$points$duplicate_label, levels = sorted_duplicates)
-  }
-  
-  # ============================================================================
-  # 11. CONFIGURE SHAPES FOR DUPLICATES (IF REQUESTED)
-  # ============================================================================
-  
-  if (shape_by_duplicate && n_plates > 1 && n_groups == 1) {
-    default_shapes <- c(16, 17, 15, 18, 3, 4, 8, 1, 2, 0, 5, 6, 7, 9, 10, 11, 12, 13, 14)
-    shape_values <- if (!is.null(point_shapes) && length(point_shapes) >= n_plates) {
-      point_shapes[1:n_plates]
-    } else {
-      default_shapes[1:n_plates]
-    }
-    shape_mapping <- setNames(shape_values, sorted_duplicates)
-  }
-  
-  # ============================================================================
-  # 12. CREATE THE PLOT
-  # ============================================================================
-  
-  p <- ggplot2::ggplot()
-  
-  # Configure colors
-  if (is.null(colors)) {
-    colors <- if (n_groups == 1) scales::hue_pal()(n_plates) else scales::hue_pal()(n_groups)
-  }
-  
-  # Function to define plot elements based on strategy
-  add_plot_elements <- function() {
+  if (is.null(plot_title)) {
     if (n_groups == 1) {
-      # Single compound group, multiple plates
-      if (shape_by_duplicate && n_plates > 1) {
-        # Use both colors and shapes for duplicates
-        return(list(
-          geom_line = ggplot2::aes(x = log_inhibitor, y = response, 
-                                   color = duplicate_label, group = plot_group),
-          geom_point = ggplot2::aes(x = log_inhibitor, y = mean_response, 
-                                    color = duplicate_label, shape = duplicate_label),
-          scale_color = ggplot2::scale_color_manual(
-            values = setNames(colors[1:n_plates], sorted_duplicates), 
-            name = legend_title_final, breaks = sorted_duplicates),
-          scale_shape = ggplot2::scale_shape_manual(
-            values = shape_mapping, name = legend_title_final, breaks = sorted_duplicates),
-          error_aes = ggplot2::aes(x = log_inhibitor, 
-                                   ymin = mean_response - sd_response, 
-                                   ymax = mean_response + sd_response, 
-                                   color = duplicate_label)
-        ))
-      } else {
-        # Use only colors for duplicates
-        return(list(
-          geom_line = ggplot2::aes(x = log_inhibitor, y = response, 
-                                   color = duplicate_label, group = plot_group),
-          geom_point = ggplot2::aes(x = log_inhibitor, y = mean_response, 
-                                    color = duplicate_label),
-          scale_color = ggplot2::scale_color_manual(
-            values = setNames(colors[1:n_plates], sorted_duplicates), 
-            name = legend_title_final, breaks = sorted_duplicates),
-          scale_shape = NULL,
-          error_aes = ggplot2::aes(x = log_inhibitor, 
-                                   ymin = mean_response - sd_response, 
-                                   ymax = mean_response + sd_response, 
-                                   color = duplicate_label)
-        ))
-      }
+      comp_name <- unique(plot_raw$compound)[1]; targ_name <- unique(plot_raw$target)[1]
+      final_title <- if(nchar(comp_name) > 0) comp_name else targ_name
     } else {
-      # Multiple compound groups
-      return(list(
-        geom_line = ggplot2::aes(x = log_inhibitor, y = response, 
-                                 color = group_key, group = plot_group),
-        geom_point = ggplot2::aes(x = log_inhibitor, y = mean_response, 
-                                  color = group_key),
-        scale_color = ggplot2::scale_color_manual(
-          values = setNames(colors[1:n_groups], names(selected_groups)), 
-          name = legend_title_final),
-        scale_shape = NULL,
-        error_aes = ggplot2::aes(x = log_inhibitor, 
-                                 ymin = mean_response - sd_response, 
-                                 ymax = mean_response + sd_response, 
-                                 color = group_key)
-      ))
+      final_title <- if(!is.null(facet_by)) "Comparative DRC Analysis" else paste("Analysis:", match_desc)
+    }
+  } else { final_title <- plot_title }
+
+  # Colors
+  n_legend_items <- length(unique(plot_curve$legend_group))
+  final_colors <- generate_palette(colors, n_legend_items)
+
+  # Shapes (only if shape_by_duplicate is active for single compound)
+  use_shapes <- shape_by_duplicate && n_groups == 1
+  if (use_shapes) {
+    if (is.null(point_shapes)) final_shapes <- 15:(15 + n_legend_items - 1) else final_shapes <- rep(point_shapes, length.out = n_legend_items)
+    names(final_shapes) <- levels(plot_curve$legend_group)
+  }
+
+  yt <- if(is.null(y_axis_title)) "BRET ratio" else y_axis_title
+  lt <- if(!is.null(legend_title)) legend_title else (if(n_groups > 1) "Compound" else "Replicate")
+
+  # ============================================================================
+  # 7. PLOTTING (GGPLOT2)
+  # ============================================================================
+  p <- ggplot() +
+    geom_line(data = plot_curve,
+              aes(x = log_inhibitor, y = response, color = legend_group, group = unique_id),
+              linewidth = 1, alpha = 0.8) +
+    geom_point(data = plot_stats,
+               aes(x = log_inhibitor, y = mean_response, color = legend_group, shape = if(use_shapes) legend_group else NULL),
+               size = 3)
+
+  if (show_error_bars) {
+    p <- p + geom_errorbar(data = plot_stats,
+                           aes(x = log_inhibitor, ymin = mean_response - sd_response, ymax = mean_response + sd_response, color = legend_group),
+                           width = 0.05, linewidth = 0.5, alpha = 0.6)
+  }
+
+  p <- p + scale_color_manual(values = final_colors, name = lt)
+
+  if (use_shapes) {
+    p <- p + scale_shape_manual(values = final_shapes, name = lt)
+  } else {
+    p <- p + guides(shape = "none")
+  }
+
+  # Faceting
+  if (!is.null(facet_by)) {
+    if (!facet_by %in% names(plot_curve)) warning("Facet column '", facet_by, "' not found.")
+    else p <- p + facet_wrap(as.formula(paste("~", facet_by)), ncol = facet_ncol, scales = facet_scales)
+  }
+
+  # Theme
+  base_theme <- if(show_grid) theme_minimal(base_family = font_family) else theme_classic(base_family = font_family)
+
+  p <- p +
+    labs(title = final_title, x = expression(paste("Log"[10], " Concentration [M]")), y = yt) +
+    base_theme +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+      axis.text = element_text(color = axis_text_color, size = axis_text_size),
+      axis.title = element_text(color = axis_title_color, size = axis_title_size, face = "bold"),
+      legend.position = if(show_legend) legend_position else "none",
+      legend.title = element_text(face="bold"),
+      legend.text = element_text(size = 10, margin = margin(t=2, b=2)),
+      panel.border = element_blank(),
+      axis.line = element_line(color = "black", linewidth = 0.5),
+      strip.background = element_rect(fill = "#f0f0f0", color = NA),
+      strip.text = element_text(face = "bold", size = 11, color = "black")
+    )
+
+  if (!show_grid) p <- p + theme(panel.grid = element_blank())
+
+  # Handle Y-limits vs Free Scales
+  if (!is.null(y_limits)) {
+    if (!is.null(facet_by) && grepl("free", facet_scales)) {
+      if(verbose) message("Warning: 'y_limits' ignored because 'facet_scales' is set to free.")
+    } else {
+      p <- p + coord_cartesian(ylim = y_limits)
     }
   }
-  
-  # Get plot elements and add to plot
-  plot_elements <- add_plot_elements()
-  
-  p <- p + 
-    ggplot2::geom_line(data = plot_data$curves, plot_elements$geom_line, 
-                       linewidth = 1, alpha = 0.8)
-  
-  if (nrow(plot_data$points) > 0) {
-    p <- p + ggplot2::geom_point(data = plot_data$points, plot_elements$geom_point, 
-                                 size = 3)
-  }
-  
-  p <- p + plot_elements$scale_color
-  
-  if (!is.null(plot_elements$scale_shape)) {
-    p <- p + plot_elements$scale_shape
-  }
-  
-  # Add error bars if requested
-  if (show_error_bars && nrow(plot_data$points) > 0 && "sd_response" %in% colnames(plot_data$points)) {
-    p <- p + ggplot2::geom_errorbar(data = plot_data$points, plot_elements$error_aes, 
-                                    width = 0.05, linewidth = 0.5, alpha = 0.6)
-  }
-  
+
   # ============================================================================
-  # 13. CONFIGURE PLOT THEME
+  # 8. OUTPUT
   # ============================================================================
-  
-  base_theme <- ggplot2::theme_minimal() + 
-    ggplot2::theme(
-      legend.position = ifelse(show_legend, legend_position, "none"),
-      plot.title = ggplot2::element_text(hjust = 0.5, face = "bold", size = 16),
-      axis.text = ggplot2::element_text(color = axis_text_color, size = axis_text_size),
-      axis.title = ggplot2::element_text(color = axis_title_color, size = axis_title_size, face = "bold"),
-      axis.line.x.bottom = ggplot2::element_line(color = "black", linewidth = 0.5),
-      axis.line.y.left = ggplot2::element_line(color = "black", linewidth = 0.5),
-      axis.line.x.top = ggplot2::element_blank(),
-      axis.line.y.right = ggplot2::element_blank(),
-      axis.ticks = ggplot2::element_line(color = "black"),
-      axis.ticks.length = ggplot2::unit(0.15, "cm"),
-      legend.text = ggplot2::element_text(size = 10),
-      legend.title = ggplot2::element_text(size = 12, face = "bold"),
-      panel.border = ggplot2::element_blank()
-    )
-  
-  # Remove grid if requested
-  if (!show_grid) {
-    base_theme <- base_theme + ggplot2::theme(
-      panel.grid.major = ggplot2::element_blank(),
-      panel.grid.minor = ggplot2::element_blank()
-    )
-  }
-  
-  # Apply theme and labels
-  p <- p + 
-    ggplot2::labs(x = expression(paste("Log"[10], " Concentration [M]")),
-                  y = y_axis_title_final,
-                  title = plot_title_final) +
-    ggplot2::coord_cartesian(ylim = y_limits) +
-    base_theme
-  
-  # Adjust legend when using shapes
-  if (shape_by_duplicate && n_groups == 1 && n_plates > 1) {
-    p <- p + ggplot2::guides(
-      color = ggplot2::guide_legend(override.aes = list(shape = shape_mapping[sorted_duplicates]))
-    )
-  }
-  
-  # ============================================================================
-  # 14. DISPLAY AND SAVE PLOT
-  # ============================================================================
-  
   print(p)
-  
+
   if (!is.null(save_plot)) {
-    ggplot2::ggsave(save_plot, plot = p, width = plot_width, 
-                    height = plot_height, dpi = plot_dpi)
-    if (verbose) message("Plot saved as: ", save_plot)
+    ggsave(save_plot, plot = p, width = plot_width, height = plot_height, dpi = plot_dpi)
+    if(verbose) message("Plot saved to: ", save_plot)
   }
-  
-  # ============================================================================
-  # 15. RETURN METADATA
-  # ============================================================================
-  
-  metadata <- list(
-    selected_groups = names(selected_groups),
-    n_groups = n_groups,
-    n_plates = n_plates,
-    unique_targets = unique_targets,
-    unique_compounds = unique_compounds,
-    match_type = match_type,
-    input_used = input_used,
-    is_normalized = is_normalized,
-    plot_title = plot_title_final,
-    y_axis_title = y_axis_title_final,
-    duplicate_labels = sorted_duplicates,
-    shape_by_duplicate = shape_by_duplicate,
-    show_grid = show_grid
-  )
-  
-  attr(p, "metadata") <- metadata
-  
-  return(p)
+
+  return(invisible(p))
 }
