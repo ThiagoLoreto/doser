@@ -2,6 +2,7 @@
 
 export(batch_drc_analysis)
 export(batch_ratio_analysis)
+export(batch_save_all_drc_plots)
 export(fit_drc_3pl)
 export(fit_drc_4pl)
 export(plot_all_dose_responses)

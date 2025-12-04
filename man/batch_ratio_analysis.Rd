@@ -103,7 +103,7 @@ If the sheet is \code{"Exp_07"}, the data file must contain \code{"_07.xlsx"}.
 \code{generate_reports = FALSE}.
 \item Optionally generates a consolidated report containing:
 \itemize{
-\item A "Summary" sheet with plate status, number of targets, data file used,
+\item A "Summary" sheet with plate status, number of constructs, data file used,
 and overall quality classification.
 \item Individual sheets containing interval mean tables (\code{interval_means}) for
 each processed plate.

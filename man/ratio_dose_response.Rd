@@ -30,7 +30,7 @@ typically maximum inhibition samples).}
 into separate columns (default: TRUE).}
 
 \item{info_table}{Data frame with experimental metadata containing at least 4 columns:
-log(inhibitor), Plate_Row, Target, and Compound information.}
+log(inhibitor), Plate_Row, Construct, and Compound information.}
 
 \item{save_to_excel}{Character string specifying Excel file path for saving processed results
 (default: NULL, no saving).}
@@ -43,8 +43,8 @@ A list containing the following components:
 \item \code{original_ratio_table}: Original calculated ratio table from raw data
 \item \code{modified_ratio_table}: Processed and formatted table ready for analysis
 \item \code{general_means}: Data frame with general control means across all rows
-\item \code{interval_means}: Data frame with target-specific means and quality metrics
-\item \code{target_intervals}: List mapping targets to row intervals
+\item \code{interval_means}: Data frame with construct-specific means and quality metrics
+\item \code{construct_intervals}: List mapping constructs to row intervals
 }
 }
 \description{
@@ -83,7 +83,7 @@ The function expects \strong{raw experimental data} in the following format:
 \preformatted{
 Column 1: log(inhibitor) - Numeric values of inhibitor concentrations in log scale
 Column 2: Plate_Row - Row identifiers matching the ratio table (e.g., "A", "B", "C", etc.)
-Column 3: Target - Target protein identifiers (e.g., "BRD4", "EGFR", "KRAS")
+Column 3: Construct - Construct protein identifiers (e.g., "BRD4", "EGFR", "KRAS")
 Column 4: Compound - Compound identifiers (e.g., "JQ1", "Gefitinib", "ARS-1620")
 }
 

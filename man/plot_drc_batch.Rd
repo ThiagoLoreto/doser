@@ -20,7 +20,6 @@ plot_drc_batch(
   facet_by = NULL,
   facet_ncol = NULL,
   facet_scales = "fixed",
-  show_IC50 = FALSE,
   save_plot = NULL,
   plot_width = 12,
   plot_height = 8,
@@ -88,9 +87,6 @@ Options: \code{"compound"}, \code{"target"}, \code{"plate"}. Default is \code{NU
 \item{facet_scales}{Character. Scaling of axes in facets.
 Options: \code{"fixed"} (default), \code{"free"}, \code{"free_y"}, \code{"free_x"}.}
 
-\item{show_IC50}{Logical. If \code{TRUE}, extracts the IC50/EC50 from the model and displays it
-in the plot legend. Also prints a summary table to the console.}
-
 \item{save_plot}{Character string. File path to save the plot (e.g., "plot.png", "plot.pdf").
 If \code{NULL}, the plot is not saved automatically.}
 
@@ -115,6 +111,9 @@ If \code{NULL}, the plot is not saved automatically.}
 \item{axis_title_color}{Character. Color of axis titles.}
 
 \item{axis_title_size}{Numeric. Size of axis titles.}
+
+\item{show_IC50}{Logical. If \code{TRUE}, extracts the IC50/EC50 from the model and displays it
+in the plot legend. Also prints a summary table to the console.}
 }
 \value{
 A \code{ggplot2} object. This allows further modification using standard ggplot syntax

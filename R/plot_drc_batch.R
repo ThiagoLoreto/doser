@@ -111,6 +111,8 @@
 
 
 
+
+
 plot_drc_batch <- function(batch_drc_results,
                            target_compound = NULL,
                            position = NULL,
@@ -123,13 +125,9 @@ plot_drc_batch <- function(batch_drc_results,
                            shape_by_duplicate = FALSE,
                            show_grid = FALSE,
                            font_family = "sans",
-                           # --- Facet Arguments ---
-                           facet_by = NULL,      # Options: "compound", "target", "plate", or NULL
+                           facet_by = NULL,
                            facet_ncol = NULL,
                            facet_scales = "fixed",
-                           # --- IC50 Annotation ---
-                           show_IC50 = FALSE,    # If TRUE, adds values to the legend
-                           # -----------------------
                            save_plot = NULL,
                            plot_width = 12,
                            plot_height = 8,
@@ -144,7 +142,7 @@ plot_drc_batch <- function(batch_drc_results,
                            axis_title_size = 14) {
 
   # ============================================================================
-  # 1. DEPENDENCY CHECK
+  # 1. SETUP
   # ============================================================================
   required_packages <- c("ggplot2", "scales", "dplyr", "tidyr", "tibble")
   missing_packages <- sapply(required_packages, function(pkg) {
@@ -159,16 +157,21 @@ plot_drc_batch <- function(batch_drc_results,
     library(ggplot2); library(scales); library(dplyr); library(tidyr); library(tibble)
   })
 
+  # Extração robusta do objeto de análise
+  if (is.list(batch_drc_results) && "drc_results" %in% names(batch_drc_results)) {
+    if (verbose) message("Detected analysis wrapper object. Extracting 'drc_results'...")
+    batch_drc_results <- batch_drc_results$drc_results
+  }
+
   if (length(batch_drc_results) == 0) stop("The DRC results list is empty.")
-  if (verbose) message("Processing DRC batch results...")
+  if (verbose) message("Processing DRC batch results for plotting...")
 
   # ============================================================================
   # 2. HELPER FUNCTIONS
   # ============================================================================
-
-  # Cleans compound names and handles "Target:Compound" format
   parse_compound_name <- function(name) {
-    clean_name <- trimws(gsub("\\.\\d+$", "", name)) # Remove suffix like .2 or .10
+    if (is.null(name)) return(list(target = "Unknown", compound = "Unknown"))
+    clean_name <- trimws(gsub("\\.\\d+$", "", name))
 
     if (grepl(" \\| ", clean_name)) {
       parts <- strsplit(clean_name, " \\| ")[[1]]
@@ -183,116 +186,94 @@ plot_drc_batch <- function(batch_drc_results,
     }
   }
 
-  # Generates color palettes (supports viridis, ggsci, RColorBrewer, or manual vectors)
   generate_palette <- function(user_input, n_needed) {
     if (is.null(user_input)) return(scales::hue_pal()(n_needed))
     if (length(user_input) > 1) return(rep(user_input, length.out = n_needed))
 
     pal_name <- tolower(user_input)
-
-    # Viridis options
     if (pal_name %in% c("viridis", "magma", "plasma", "inferno", "cividis", "turbo")) {
       if (requireNamespace("viridis", quietly = TRUE)) return(viridis::viridis_pal(option = pal_name)(n_needed))
     }
-
-    # Scientific journals (ggsci)
-    ggsci_map <- list("npg"="pal_npg", "aaas"="pal_aaas", "nejm"="pal_nejm", "lancet"="pal_lancet", "jama"="pal_jama", "jamma"="pal_jama", "jco"="pal_jco", "ucscgb"="pal_ucscgb", "d3"="pal_d3")
-    if (pal_name %in% names(ggsci_map)) {
-      if (requireNamespace("ggsci", quietly = TRUE)) {
-        pal_func <- get(ggsci_map[[pal_name]], asNamespace("ggsci"))
-        tryCatch({
-          base <- pal_func()(n_needed)
-          if(length(base) < n_needed) return(colorRampPalette(base)(n_needed)) else return(base[1:n_needed])
-        }, error = function(e) { return(colorRampPalette(pal_func()(10))(n_needed)) })
-      }
-    }
-
-    # RColorBrewer
     if (requireNamespace("RColorBrewer", quietly = TRUE)) {
-      brewer_pals <- rownames(RColorBrewer::brewer.pal.info)
-      match_idx <- which(tolower(brewer_pals) == pal_name)
-      if (length(match_idx) > 0) {
-        real_name <- brewer_pals[match_idx[1]]; max_n <- RColorBrewer::brewer.pal.info[real_name, "maxcolors"]
-        base <- RColorBrewer::brewer.pal(min(max(n_needed, 3), max_n), real_name)
-        if (n_needed > max_n) return(colorRampPalette(base)(n_needed)) else return(base[1:n_needed])
+      if (pal_name %in% tolower(rownames(RColorBrewer::brewer.pal.info))) {
+        return(colorRampPalette(RColorBrewer::brewer.pal(8, pal_name))(n_needed))
       }
     }
-
-    # Fallback to manual single color repeated
     return(rep(user_input, length.out = n_needed))
   }
 
+  get_detailed_results <- function(plate_obj) {
+    if (is.null(plate_obj$drc_result)) return(NULL)
+    res <- plate_obj$drc_result$detailed_results
+    if (is.null(res)) res <- plate_obj$drc_result$curve_results
+    if (is.null(res)) res <- plate_obj$drc_result$fits
+    if (is.list(res) && length(res) > 0) return(res)
+    return(NULL)
+  }
+
   # ============================================================================
-  # 3. DATA & IC50 EXTRACTION
+  # 3. DATA EXTRACTION (SEM IC50)
   # ============================================================================
-  raw_data_list <- list(); curve_data_list <- list(); ec50_lookup_list <- list(); counter <- 0
+  raw_data_list <- list(); curve_data_list <- list(); counter <- 0
 
   for (plate_name in names(batch_drc_results)) {
-    plate_res <- batch_drc_results[[plate_name]]$drc_result$detailed_results
+    plate_res_list <- get_detailed_results(batch_drc_results[[plate_name]])
+    if (is.null(plate_res_list)) next
 
-    for (i in seq_along(plate_res)) {
-      res <- plate_res[[i]]
-      if (is.null(res$model) || !isTRUE(res$success) || is.null(res$data)) next
+    for (i in seq_along(plate_res_list)) {
+      res <- plate_res_list[[i]]
+      has_success <- !is.null(res$success) && isTRUE(res$success)
+      has_data <- !is.null(res$data) && nrow(res$data) > 0
 
-      info <- parse_compound_name(res$compound)
+      if (!has_success || !has_data) next
+
+      comp_name <- res$compound
+      if(is.null(comp_name)) comp_name <- paste0("Cmpd_", i)
+
+      info <- parse_compound_name(comp_name)
       tc_key <- paste(info$target, info$compound, sep = ":")
       unique_id <- paste(plate_name, i, sep = "_")
       counter <- counter + 1
 
-      # Extract IC50/EC50 from model coefficients
-      ic50_val <- NA
-      try({
-        coefs <- coef(res$model)
-        # Look for parameter 'e' (standard for log-logistic models)
-        e_params <- coefs[grep(":(e|ED50)", names(coefs))]
-        if (length(e_params) > 0) {
-          ic50_val <- as.numeric(e_params[1])
-        } else if (!is.null(res$ec50)) {
-          ic50_val <- res$ec50
-        }
-      }, silent = TRUE)
-
-      ec50_lookup_list[[counter]] <- data.frame(
-        unique_id = unique_id, ic50 = ic50_val, plate = plate_name,
-        compound = info$compound, stringsAsFactors = FALSE
-      )
+      # (REMOVIDO: Extração de IC50)
 
       valid_data <- res$data %>%
         filter(is.finite(log_inhibitor) & is.finite(response)) %>%
-        mutate(plate = plate_name, target = info$target, compound = info$compound, target_compound = tc_key, unique_id = unique_id)
+        mutate(plate = plate_name, target = info$target, compound = info$compound,
+               target_compound = tc_key, unique_id = unique_id)
 
       if (nrow(valid_data) >= 2) {
         raw_data_list[[counter]] <- valid_data
-
-        # Generate curve points based on model prediction
-        try({
-          x_range <- range(valid_data$log_inhibitor, na.rm = TRUE)
-          x_seq <- seq(x_range[1], x_range[2], length.out = 100)
-          pred_y <- predict(res$model, newdata = data.frame(log_inhibitor = x_seq))
-
-          curve_data_list[[counter]] <- data.frame(
-            log_inhibitor = x_seq, response = pred_y, plate = plate_name,
-            target = info$target, compound = info$compound, target_compound = tc_key, unique_id = unique_id
-          )
-        }, silent = TRUE)
+        model_obj <- res$model
+        if (!is.null(model_obj)) {
+          try({
+            x_range <- range(valid_data$log_inhibitor, na.rm = TRUE)
+            x_span <- diff(x_range)
+            x_seq <- seq(x_range[1] - 0.1*x_span, x_range[2] + 0.1*x_span, length.out = 100)
+            pred_y <- predict(model_obj, newdata = data.frame(log_inhibitor = x_seq))
+            curve_data_list[[counter]] <- data.frame(
+              log_inhibitor = x_seq, response = pred_y, plate = plate_name,
+              target = info$target, compound = info$compound, target_compound = tc_key, unique_id = unique_id
+            )
+          }, silent = TRUE)
+        }
       }
     }
   }
 
-  if (length(raw_data_list) == 0) stop("No valid data found in batch results.")
+  if (length(raw_data_list) == 0) stop("No valid data found.")
 
   df_raw_master <- bind_rows(raw_data_list)
   df_curve_master <- bind_rows(curve_data_list)
-  df_ec50_master <- bind_rows(ec50_lookup_list)
+  # (REMOVIDO: df_ec50_master)
 
   # ============================================================================
-  # 4. FILTERING LOGIC
+  # 4. FILTERING
   # ============================================================================
   unique_combinations <- df_raw_master %>% select(target_compound, target, compound, unique_id) %>% distinct()
   selected_ids <- NULL; match_desc <- ""
 
   if (!is.null(position)) {
-    # Select by index position
     unique_tc <- unique(unique_combinations$target_compound)
     if (position > length(unique_tc)) stop("Invalid position index.")
     target_tc <- unique_tc[position]
@@ -300,31 +281,19 @@ plot_drc_batch <- function(batch_drc_results,
     match_desc <- paste("Pos:", position)
 
   } else if (!is.null(target_compound)) {
-    # Select by name string
-    search_term <- target_compound; matches <- NULL
-
+    search_term <- target_compound
     if (grepl(":", search_term)) {
-      # Specific Target:Compound match
       parts <- strsplit(search_term, ":")[[1]]
       target_query <- trimws(parts[1]); compound_query <- if(length(parts) > 1) trimws(parts[2]) else ""
       matches <- unique_combinations %>% filter(target == target_query, compound == compound_query)
-
-      # Fallback to case-insensitive match
-      if (nrow(matches) == 0) {
-        matches <- unique_combinations %>%
-          filter(tolower(target) == tolower(target_query), tolower(compound) == tolower(compound_query))
-      }
+      if (nrow(matches) == 0) matches <- unique_combinations %>% filter(tolower(target) == tolower(target_query), tolower(compound) == tolower(compound_query))
     } else {
-      # General fuzzy search
-      matches <- unique_combinations %>%
-        filter(grepl(search_term, compound, ignore.case=TRUE) | grepl(search_term, target, ignore.case=TRUE))
+      matches <- unique_combinations %>% filter(grepl(search_term, compound, ignore.case=TRUE) | grepl(search_term, target, ignore.case=TRUE))
     }
-
     if (nrow(matches) == 0) stop("No match found for: ", search_term)
     selected_ids <- matches$unique_id; match_desc <- search_term
 
   } else {
-    # Default: Select first available
     first_tc <- unique_combinations$target_compound[1]
     selected_ids <- unique_combinations %>% filter(target_compound == first_tc) %>% pull(unique_id)
     match_desc <- "First compound"
@@ -332,51 +301,36 @@ plot_drc_batch <- function(batch_drc_results,
 
   plot_raw <- df_raw_master %>% filter(unique_id %in% selected_ids)
   plot_curve <- df_curve_master %>% filter(unique_id %in% selected_ids)
-  selected_ec50s <- df_ec50_master %>% filter(unique_id %in% selected_ids)
-
-  # Print IC50 summary to console
-  if (verbose && nrow(selected_ec50s) > 0) {
-    message("\n--- IC50/EC50 Values Summary ---")
-    print_table <- selected_ec50s %>%
-      select(plate, compound, ic50) %>%
-      mutate(ic50_formatted = sprintf("%.3e", ic50))
-    print(print_table)
-    message("--------------------------------\n")
-  }
+  # (REMOVIDO: selected_ec50s)
 
   # ============================================================================
-  # 5. DATA AGGREGATION & LEGEND SETUP
+  # 5. DATA AGGREGATION & LEGEND
   # ============================================================================
   plot_stats <- plot_raw %>%
     group_by(plate, target, compound, target_compound, unique_id, log_inhibitor) %>%
-    summarise(mean_response = mean(response, na.rm=T), sd_response = sd(response, na.rm=T), .groups="drop")
+    summarise(mean_response = mean(response, na.rm=T),
+              sd_response = sd(response, na.rm=T), .groups="drop")
 
   n_groups <- length(unique(plot_raw$target_compound))
+  n_distinct_targets <- length(unique(plot_raw$target))
 
-  # Sort plates numerically if possible
   plate_levels <- unique(plot_raw$plate)
-  nums <- as.numeric(gsub("\\D", "", plate_levels))
-  if (!any(is.na(nums))) plate_levels <- plate_levels[order(nums)] else plate_levels <- sort(plate_levels)
+  nums <- suppressWarnings(as.numeric(gsub("\\D", "", plate_levels)))
+  if (!any(is.na(nums)) && length(nums) == length(plate_levels)) plate_levels <- plate_levels[order(nums)] else plate_levels <- sort(plate_levels)
 
-  # Helper to create plotting columns and inject IC50 into legend
   create_cols <- function(df) {
-    df <- df %>% left_join(selected_ec50s %>% select(unique_id, ic50), by = "unique_id")
-
+    # (REMOVIDO: left_join com ec50)
     df %>% mutate(
       plate = factor(plate, levels = plate_levels),
-      dup_lbl = ifelse(grepl("\\d", plate), paste("Duplicate", gsub("\\D", "", plate)), as.character(plate)),
+      dup_lbl = ifelse(grepl("\\d", plate), paste("Plate", gsub("\\D", "", plate)), as.character(plate)),
 
-      base_label = if(n_groups > 1) target_compound else dup_lbl,
-
-      # Inject IC50 if requested
-      legend_group = if(show_IC50) {
-        ifelse(!is.na(ic50),
-               paste0(base_label, "\n(IC50: ", sprintf("%.2e", ic50), " M)"),
-               base_label)
+      base_label = if(n_groups > 1) {
+        if (n_distinct_targets == 1) compound else target_compound
       } else {
-        base_label
+        dup_lbl
       },
-      legend_group = factor(legend_group)
+
+      legend_group = factor(base_label)
     )
   }
 
@@ -384,40 +338,38 @@ plot_drc_batch <- function(batch_drc_results,
   plot_stats <- create_cols(plot_stats)
 
   # ============================================================================
-  # 6. VISUAL CONFIGURATION
+  # 6. GGPLOT
   # ============================================================================
   if (is.null(plot_title)) {
     if (n_groups == 1) {
       comp_name <- unique(plot_raw$compound)[1]; targ_name <- unique(plot_raw$target)[1]
-      final_title <- if(nchar(comp_name) > 0) comp_name else targ_name
+      if (targ_name == "Unknown" || targ_name == "" || targ_name == comp_name) final_title <- comp_name
+      else final_title <- paste(targ_name, comp_name, sep = " : ")
     } else {
-      final_title <- if(!is.null(facet_by)) "Comparative DRC Analysis" else paste("Analysis:", match_desc)
+      if (!is.null(facet_by)) final_title <- "Comparative DRC Analysis"
+      else final_title <- match_desc
     }
   } else { final_title <- plot_title }
 
-  # Colors
   n_legend_items <- length(unique(plot_curve$legend_group))
   final_colors <- generate_palette(colors, n_legend_items)
 
-  # Shapes (only if shape_by_duplicate is active for single compound)
   use_shapes <- shape_by_duplicate && n_groups == 1
   if (use_shapes) {
     if (is.null(point_shapes)) final_shapes <- 15:(15 + n_legend_items - 1) else final_shapes <- rep(point_shapes, length.out = n_legend_items)
     names(final_shapes) <- levels(plot_curve$legend_group)
   }
 
-  yt <- if(is.null(y_axis_title)) "BRET ratio" else y_axis_title
+  yt <- if(is.null(y_axis_title)) "Response" else y_axis_title
   lt <- if(!is.null(legend_title)) legend_title else (if(n_groups > 1) "Compound" else "Replicate")
 
-  # ============================================================================
-  # 7. PLOTTING (GGPLOT2)
-  # ============================================================================
   p <- ggplot() +
     geom_line(data = plot_curve,
               aes(x = log_inhibitor, y = response, color = legend_group, group = unique_id),
               linewidth = 1, alpha = 0.8) +
     geom_point(data = plot_stats,
-               aes(x = log_inhibitor, y = mean_response, color = legend_group, shape = if(use_shapes) legend_group else NULL),
+               aes(x = log_inhibitor, y = mean_response, color = legend_group,
+                   shape = if(use_shapes) legend_group else NULL),
                size = 3)
 
   if (show_error_bars) {
@@ -428,19 +380,14 @@ plot_drc_batch <- function(batch_drc_results,
 
   p <- p + scale_color_manual(values = final_colors, name = lt)
 
-  if (use_shapes) {
-    p <- p + scale_shape_manual(values = final_shapes, name = lt)
-  } else {
-    p <- p + guides(shape = "none")
-  }
+  if (use_shapes) p <- p + scale_shape_manual(values = final_shapes, name = lt)
+  else p <- p + guides(shape = "none")
 
-  # Faceting
   if (!is.null(facet_by)) {
     if (!facet_by %in% names(plot_curve)) warning("Facet column '", facet_by, "' not found.")
     else p <- p + facet_wrap(as.formula(paste("~", facet_by)), ncol = facet_ncol, scales = facet_scales)
   }
 
-  # Theme
   base_theme <- if(show_grid) theme_minimal(base_family = font_family) else theme_classic(base_family = font_family)
 
   p <- p +
@@ -452,26 +399,25 @@ plot_drc_batch <- function(batch_drc_results,
       axis.title = element_text(color = axis_title_color, size = axis_title_size, face = "bold"),
       legend.position = if(show_legend) legend_position else "none",
       legend.title = element_text(face="bold"),
-      legend.text = element_text(size = 10, margin = margin(t=2, b=2)),
+      legend.text = element_text(size = 10),
       panel.border = element_blank(),
       axis.line = element_line(color = "black", linewidth = 0.5),
       strip.background = element_rect(fill = "#f0f0f0", color = NA),
-      strip.text = element_text(face = "bold", size = 11, color = "black")
+      strip.text = element_text(face = "bold", size = 11)
     )
 
   if (!show_grid) p <- p + theme(panel.grid = element_blank())
 
-  # Handle Y-limits vs Free Scales
   if (!is.null(y_limits)) {
     if (!is.null(facet_by) && grepl("free", facet_scales)) {
-      if(verbose) message("Warning: 'y_limits' ignored because 'facet_scales' is set to free.")
+      if(verbose) message("Warning: 'y_limits' ignored due to free facet scales.")
     } else {
       p <- p + coord_cartesian(ylim = y_limits)
     }
   }
 
   # ============================================================================
-  # 8. OUTPUT
+  # 7. OUTPUT
   # ============================================================================
   print(p)
 
@@ -482,3 +428,4 @@ plot_drc_batch <- function(batch_drc_results,
 
   return(invisible(p))
 }
+
