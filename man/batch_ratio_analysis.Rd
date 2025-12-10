@@ -2,7 +2,7 @@
 % Please edit documentation in R/batch_ratio_analysis.R
 \name{batch_ratio_analysis}
 \alias{batch_ratio_analysis}
-\title{Batch Processing of Ratio-Based Dose-Response Analyses}
+\title{Batch Processing of Ratio-Based Dose-Response Analyses with Version Control}
 \usage{
 batch_ratio_analysis(
   directory = getwd(),
@@ -14,6 +14,7 @@ batch_ratio_analysis(
   data_pattern = "_\\\\d+\\\\.xlsx$",
   output_dir = NULL,
   generate_reports = TRUE,
+  function_version = "v1",
   verbose = TRUE
 )
 }
@@ -22,16 +23,33 @@ batch_ratio_analysis(
 info table file. Defaults to the current working directory.}
 
 \item{control_0perc}{Value or identifier of the \strong{0\% control} (minimum).
-Passed directly to \code{ratio_dose_response()}.}
+Interpretation depends on \code{function_version}:
+\itemize{
+\item \strong{For \code{function_version = "v1"}}: Must be a single column name (e.g., \code{"DMSO"})
+\item \strong{For \code{function_version = "v2"}}: Can be either:
+\itemize{
+\item A single numeric value (e.g., \code{16}) for fixed-value 0\% control
+\item A single column name (e.g., \code{"DMSO_Column"}) for column-based control
+}
+}}
 
 \item{control_100perc}{Value or identifier of the \strong{100\% control} (maximum).
-Passed directly to \code{ratio_dose_response()}.}
+Interpretation depends on \code{function_version}:
+\itemize{
+\item \strong{For \code{function_version = "v1"}}: Must be a single column name (e.g., \code{"Staurosporine"})
+\item \strong{For \code{function_version = "v2"}}: Can be either:
+\itemize{
+\item A numeric vector of column positions (e.g., \code{c(12, 24)}) for multiple controls
+\item A character vector of column names (e.g., \code{c("Ctrl_A", "Ctrl_B")})
+}
+}}
 
-\item{split_replicates}{Logical. If \code{TRUE} (default), replicates are processed
-individually inside \code{ratio_dose_response()}.}
+\item{split_replicates}{Logical. If \code{TRUE} (default), technical replicates are
+separated into individual columns with \code{.2} suffix.}
 
 \item{low_value_threshold}{Minimum acceptable signal value for filtering
-low-quality data.}
+low-quality data. Values below this threshold are replaced with \code{NA}.
+Defaults to \code{1000}.}
 
 \item{info_file}{Name of the Excel file containing info sheets for each plate.
 Defaults to \code{"info_tables.xlsx"}.}
@@ -42,11 +60,19 @@ Defaults to \code{"info_tables.xlsx"}.}
 \item{output_dir}{Directory where processed result files and consolidated
 reports will be saved. If \code{NULL}, defaults to \code{directory}.}
 
-\item{generate_reports}{If \code{TRUE} (default), creates a consolidated
-\code{batch_analysis_report.xlsx} file containing a summary and quality metrics
-for all processed plates.}
+\item{generate_reports}{Logical. If \code{TRUE} (default):
+\itemize{
+\item Creates individual Excel files for each plate: \verb{results_<number>.xlsx}
+\item Creates consolidated report: \code{batch_analysis_report.xlsx}
+}}
 
-\item{verbose}{Logical. If \code{TRUE}, prints progress messages.}
+\item{function_version}{Character specifying which processing algorithm to use:
+\itemize{
+\item \code{"v1"} (default): Original \code{ratio_dose_response()} function
+\item \code{"v2"}: Enhanced \code{ratio_dose_response_v2()} function with flexible controls
+}}
+
+\item{verbose}{Logical. If \code{TRUE} (default), prints detailed progress messages.}
 }
 \value{
 Returns a named list where each element corresponds to a successfully processed
@@ -57,86 +83,235 @@ Each entry contains:
 \item{data_file}{Raw data filename associated with the sheet.}
 \item{info_sheet}{Name of the info sheet used.}
 \item{sheet_number}{Numeric identifier extracted from the sheet name.}
-\item{result}{Full output of \code{ratio_dose_response()}.}
+\item{function_version}{Which processing algorithm was used (\code{"v1"} or \code{"v2"}).}
+\item{control_0perc}{Control 0\% specification as provided.}
+\item{control_100perc}{Control 100\% specification as provided.}
+\item{result}{Full output of the selected ratio analysis function.}
 }
 
-If \code{generate_reports = TRUE}, an Excel file
-\code{"batch_analysis_report.xlsx"}
-is also created in \code{output_dir}.
+If \code{generate_reports = TRUE}, two types of Excel files are created:
+\enumerate{
+\item Individual plate results: \verb{results_<number>.xlsx}
+\item Consolidated batch report: \code{batch_analysis_report.xlsx}
+}
 }
 \description{
 \code{batch_ratio_analysis()} automates the batch processing of multiple
-ratio-based dose–response experiments.
-It scans an info table file (typically \code{info_tables.xlsx}) containing one
-sheet per plate/experiment, identifies sheets whose names end with a numeric
-suffix (e.g., \code{"Plate_01"}, \code{"Exp_03"}, \code{"05"}), and automatically pairs each
-sheet with the corresponding raw data file.
+ratio-based dose–response experiments with support for two different
+processing algorithms. It scans an info table file (typically \code{info_tables.xlsx})
+containing one sheet per plate/experiment, identifies sheets whose names end
+with a numeric suffix, and automatically pairs each sheet with the corresponding
+raw data file.
+
+\strong{Key Features:}
+\itemize{
+\item \strong{Two processing algorithms}: Choose between original (\code{v1}) and enhanced (\code{v2})
+\item \strong{Automatic file matching}: Pairs info sheets with data files using numeric IDs
+\item \strong{Comprehensive reporting}: Generates detailed Excel reports for each plate
+\item \strong{Batch summary}: Creates consolidated report with quality metrics
+}
 
 \strong{Important:}
 The numeric suffix of the sheet name \strong{must match} the numeric identifier in
 the raw data filename. Example:
 
 • Sheet name: \code{"Plate_01"} → numeric ID: \code{"01"}
-• Raw data file: \code{"data_01.xlsx"}
+• Raw data file: \code{"data_01.xlsx"}, \code{"experiment_01.xlsx"}
 
 This numeric matching is required for the batch processing to correctly link
 each info sheet with its corresponding data file.
-
-The function runs \code{\link[=ratio_dose_response]{ratio_dose_response()}} for each matched pair, saves
-individual results, and optionally generates a consolidated Excel report.
 }
 \details{
+\subsection{Function Versions}{
+\subsection{Version 1 (\code{"v1"} - Default)}{
+
+Uses the original \code{ratio_dose_response()} function with traditional control specification:
+\itemize{
+\item \code{control_0perc}: Single column name
+\item \code{control_100perc}: Single column name
+\item \strong{Best for}: Legacy data and compatibility with previous analyses
+}
+}
+
+\subsection{Version 2 (\code{"v2"})}{
+
+Uses the enhanced \code{ratio_dose_response_v2()} function with new features:
+\itemize{
+\item \strong{Fixed-value controls}: Specify 0\% control as a numeric value (e.g., \code{16})
+\item \strong{Multiple 100\% controls}: Average multiple control columns
+\item \strong{Column positions}: Identify controls by column number
+\item \strong{New control columns}: Creates \code{Fixed_0perc} and \code{Mean_100perc} columns
+\item \strong{Better quality reporting}: Enhanced control information
+\item \strong{Best for}: New experiments and advanced control strategies
+}
+}
+
+}
+
+\subsection{Processing Pipeline}{
+
 The function performs the following steps:
 \enumerate{
-\item Loads the info table file and identifies all sheet names ending with a
-numeric suffix.
-\item Extracts the numeric portion from each sheet name (e.g., \code{"Plate_03"} → \code{"03"}).
-\item Searches for a raw data file in \code{directory} whose filename contains the
-\emph{same} numeric identifier.
+\item \strong{Sheet Identification}: Loads info file and finds sheets ending with numbers
+\item \strong{File Matching}: Extracts numeric IDs and matches with data files
+\item \strong{Data Processing}: Executes selected version of ratio analysis
+\item \strong{Result Saving}: Creates individual Excel files for each plate
+\item \strong{Report Generation}: Optionally creates consolidated batch report
+}
+}
+
+\subsection{File Matching Logic}{
 
 \strong{This numeric matching is required} for the function to determine which
 raw data file corresponds to which info sheet.
-If the sheet is \code{"Exp_07"}, the data file must contain \code{"_07.xlsx"}.
-\item Reads the raw data and the corresponding info table.
-\item Executes \code{\link[=ratio_dose_response]{ratio_dose_response()}} for each matched pair.
-\item Saves per-plate results into Excel files (\verb{results_<number>.xlsx}) unless
-\code{generate_reports = FALSE}.
-\item Optionally generates a consolidated report containing:
+The matching follows this pattern:
+
+\if{html}{\out{<div class="sourceCode">}}\preformatted{Sheet Name → Extracted Number → Data File Pattern
+"Plate_01" → "01" → "*_01.xlsx"
+"Exp_07"   → "07" → "*_07.xlsx"
+"15"       → "15" → "*_15.xlsx"
+}\if{html}{\out{</div>}}
+}
+
+\subsection{Output Files}{
+
+When \code{generate_reports = TRUE}, the following files are created:
+\subsection{Individual Plate Results (\verb{results_<number>.xlsx})}{
+
+Each file contains these sheets:
 \itemize{
-\item A "Summary" sheet with plate status, number of constructs, data file used,
-and overall quality classification.
-\item Individual sheets containing interval mean tables (\code{interval_means}) for
-each processed plate.
+\item \code{Modified_Ratio_Table}: Processed data ready for curve fitting
+\item \code{Original_Ratio_Table}: Raw calculated ratios
+\item \code{General_Means}: Overall control means (when available)
+\item \code{Interval_Means}: Construct-specific quality metrics with row names preserved
+\item \code{Control_Info}: Control processing details (v2 only)
+\item \code{Processing_Info}: Metadata about the analysis
+}
+}
+
+\subsection{Consolidated Report (\code{batch_analysis_report.xlsx})}{
+
+Contains:
+\itemize{
+\item \strong{Summary sheet}: Overview of all processed plates
+\item \strong{Individual quality sheets}: \code{interval_means} for each plate
+}
+}
+
+}
+
+\subsection{Quality Assessment}{
+
+When info tables are provided, the function calculates:
+\itemize{
+\item \strong{Luciferase Signal}: Signal intensity categories (high/medium/low/insufficient)
+\item \strong{Z-Score}: Assay robustness metric
+\item \strong{Assay Window}: Dynamic range calculation
+\item \strong{Overall Quality}: Composite assessment
 }
 }
 }
+\section{Version Selection Guide}{
+
+
+\strong{When to use \code{v1} (default):}
+\itemize{
+\item Analyzing legacy data from previous experiments
+\item Need compatibility with existing analysis pipelines
+\item Using traditional column-based controls
+\item Preferring the original, well-tested algorithm
+}
+
+\strong{When to use \code{v2}:}
+\itemize{
+\item Starting new experiments with fixed 0\% control values
+\item Have duplicate 100\% control columns that need averaging
+\item Want more detailed control information in reports
+\item Need to specify controls by column position instead of name
+\item Require enhanced quality reporting
+}
+}
+
+\section{Troubleshooting}{
+
+
+\strong{Common issues and solutions:}
+\enumerate{
+\item \strong{"No data file found for sheet..."}
+\itemize{
+\item Check that sheet names end with numbers (e.g., \code{"Plate_01"}, not \code{"Plate_One"})
+\item Verify data files contain matching numbers (e.g., \code{"_01.xlsx"})
+\item Ensure \code{data_pattern} matches your filename convention
+}
+\item \strong{Control specification errors}
+\itemize{
+\item For \code{v1}: Both controls must be single column names
+\item For \code{v2}: Check if using correct type (numeric vs character)
+\item Verify control columns exist in your data
+}
+\item \strong{Excel file issues}
+\itemize{
+\item Ensure \code{openxlsx} package is installed
+\item Close Excel files before running analysis
+\item Check file permissions in output directory
+}
+}
+}
+
 \examples{
 \dontrun{
-
-# Basic usage (using current working directory):
-batch_ratio_analysis()
-
-# Running with specified controls and output directory:
+# ===================================================================
+# EXAMPLE 1: Default settings (v1 with column names)
+# ===================================================================
 batch_ratio_analysis(
   directory = "experiment_data",
-  control_0perc = "DMSO",
-  control_100perc = "Positive_Control",
-  output_dir = "processed_results"
+  control_0perc = "DMSO_Control",
+  control_100perc = "Staurosporine_100pct",
+  # function_version = "v1" is default
 )
 
-# Running without generating the consolidated report:
+# ===================================================================
+# EXAMPLE 2: Enhanced v2 with fixed-value controls
+# ===================================================================
 batch_ratio_analysis(
-  directory = "raw_data",
-  generate_reports = FALSE
+  directory = "new_experiment_data",
+  control_0perc = 16,                # Fixed value for 0\% control
+  control_100perc = c(12, 24),       # Column positions for duplicate 100\% controls
+  function_version = "v2",
+  output_dir = "processed_v2_results",
+  verbose = TRUE
 )
 
-}
+# ===================================================================
+# EXAMPLE 3: v2 with column names (backward compatible)
+# ===================================================================
+batch_ratio_analysis(
+  directory = "mixed_data",
+  control_0perc = "DMSO_Column",
+  control_100perc = "Stauro_Column",
+  function_version = "v2",          # v2 works with column names too
+  split_replicates = FALSE,
+  generate_reports = TRUE
+)
 
+# ===================================================================
+# EXAMPLE 4: Minimal usage (current directory, default everything)
+# ===================================================================
+# Assumes: info_tables.xlsx and data_01.xlsx, data_02.xlsx, etc. exist
+results <- batch_ratio_analysis()
+
+# Access results for first plate
+plate1 <- results[["Plate_01"]]$result
+analysis_ready_data <- plate1$modified_ratio_table
+quality_metrics <- plate1$interval_means
+}
 
 }
 \seealso{
 \itemize{
-\item \code{\link[=ratio_dose_response]{ratio_dose_response()}} – The function executed for each matched plate.
-\item \code{openxlsx} – Package used for reading and writing Excel files.
+\item \code{\link[=ratio_dose_response]{ratio_dose_response()}} – Original processing function (v1)
+\item \code{\link[=ratio_dose_response_v2]{ratio_dose_response_v2()}} – Enhanced processing function (v2)
+\item \code{openxlsx} – Package used for reading and writing Excel files
+\item \code{\link[=fit_drc_3pl]{fit_drc_3pl()}} – For subsequent dose-response curve fitting
 }
 }

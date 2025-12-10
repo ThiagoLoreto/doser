@@ -1,84 +1,99 @@
-#' Batch Save All DRC Plots
-#'
-#' Automatically iterates through a batch of Dose-Response Curve (DRC) analysis results,
-#' generates plots for all valid construct-compound combinations, and saves them to a specified directory.
+#' Save All Dose-Response Curves from Batch Analysis Results
 #'
 #' @description
-#' This function extracts all successful models from the provided `batch_drc_results` list,
-#' parses the construct and compound names, sanitizes them for file creation, and saves
-#' the corresponding plots. It supports creating subfolders per plate, filtering specific plates,
-#' and excluding specific compounds.
+#' This function automatically generates and saves Dose-Response Curve (DRC) plots for all
+#' successful fits found in batch analysis results. It creates a systematic file structure
+#' and handles naming, organization, and error management.
 #'
-#' @param batch_drc_results A list containing the results of a batch DRC analysis.
-#'   The structure is expected to be a list of plates, where each plate contains
-#'   `drc_result$detailed_results`.
-#' @param output_dir Character string. The main directory where plots will be saved.
-#'   Defaults to "DRC_Plots". The directory is created if it does not exist.
-#' @param create_subfolders Logical. If \code{TRUE} (default), creates a subfolder
-#'   for each plate within \code{output_dir}. If \code{FALSE}, all plots are saved
-#'   directly in \code{output_dir} with the plate name appended to the filename to prevent duplicates.
-#' @param file_prefix Character string. A prefix added to the start of every filename.
-#'   Defaults to "DRC".
-#' @param file_extension Character string. The file format/extension for the saved plots
-#'   (e.g., "png", "pdf", "svg", "tiff"). Defaults to "png".
-#' @param overwrite Logical. If \code{TRUE}, existing files with the same name will be overwritten.
-#'   If \code{FALSE} (default), existing files are skipped to save time.
-#' @param plates_to_process Character vector (optional). A list of specific plate names
-#'   (keys in `batch_drc_results`) to process. If \code{NULL} (default), all plates are processed.
-#' @param compounds_to_exclude Character vector (optional). A list of compound names
-#'   to exclude from plotting. Matches against the parsed compound name.
-#' @param verbose Logical. If \code{TRUE} (default), displays a progress bar and
-#'   summary statistics (success/failure counts) in the console.
-#' @param show_legend Logical. Whether to display the legend in the generated plots.
-#'   Defaults to \code{FALSE} for batch processing to save space or keep plots clean.
-#'   Can be overridden to \code{TRUE} if needed.
-#' @param ... Additional arguments passed directly to the underlying \code{plot_drc_batch} function
-#'   and/or the plot saving mechanism. Common useful arguments include:
-#'   \itemize{
-#'     \item \code{plot_width}: Width of the output image (in inches).
-#'     \item \code{plot_height}: Height of the output image (in inches).
-#'     \item \code{plot_dpi}: Resolution (e.g., 300).
-#'     \item \code{y_limits}: A numeric vector of length 2 (e.g., \code{c(0, 1.5)}).
-#'     \item \code{colors}: A vector of colors for the curves.
-#'     \item \code{show_IC50}: Logical, to display the IC50 value on the plot.
-#'   }
+#' @param batch_drc_results A named list containing the results of the DRC batch analysis.
+#'   Structure expected: \code{list(plate_name = list(drc_result = list(detailed_results = ...)))}.
+#'   Can also accept a wrapper object from \code{batch_drc_analysis()} which contains a \code{drc_results} element.
+#' @param output_dir Character. Directory where plots will be saved (default: "DRC_Plots").
+#'   Created if it doesn't exist.
+#' @param create_subfolders Logical. If \code{TRUE} (default), creates separate subfolders for each plate.
+#'   If \code{FALSE}, all plots are saved directly in \code{output_dir}.
+#' @param file_prefix Character. Prefix for all saved files (default: "DRC").
+#' @param file_extension Character. File format extension (default: "png").
+#'   Other options: "pdf", "jpg", "tiff", "svg".
+#' @param overwrite Logical. If \code{TRUE}, overwrites existing files. If \code{FALSE} (default),
+#'   skips files that already exist.
+#' @param plates_to_process Character vector. Specific plate names to process.
+#'   If \code{NULL} (default), processes all plates.
+#' @param compounds_to_exclude Character vector. Compound names to exclude from plotting.
+#'   Useful for removing controls or failed compounds.
+#' @param verbose Logical. If \code{TRUE} (default), prints progress messages to the console.
+#' @param show_legend Logical. If \code{TRUE}, displays legend in plots. If \code{FALSE} (default),
+#'   omits legend for cleaner individual plots.
+#' @param ... Additional arguments passed to \code{\link{plot_drc_batch}}.
+#'   Common options: \code{y_limits}, \code{colors}, \code{plot_width}, \code{plot_height}, etc.
 #'
-#' @return An invisible list containing processing statistics:
+#' @return An invisible list containing:
 #'   \itemize{
-#'     \item \code{total}: Total number of plots attempted.
-#'     \item \code{success}: Number of successfully saved plots.
-#'     \item \code{failed}: Number of failed plots.
+#'     \item \code{total}: Total number of plots attempted
+#'     \item \code{success}: Number of successfully saved plots
+#'     \item \code{failed}: Number of failed plots
+#'     \item \code{output_dir}: Path where plots were saved
 #'   }
 #'
 #' @details
-#' The function uses a robust sanitization method to ensure filenames do not contain
-#' illegal characters (converting special characters to underscores).
-#' It assumes the compound names in the results are formatted as "Construct | Compound"
-#' or "Construct:Compound".
+#' This function scans through all batch DRC results, identifies successful fits,
+#' and generates individual plots for each construct-compound combination.
+#'
+#' \strong{Filename Generation:} Files are named using the pattern:
+#' \code{[prefix]_[construct]_[compound].[extension]} (with plate subfolders if enabled).
+#' Special characters are replaced with underscores for compatibility.
+#'
+#' \strong{File Organization:}
+#' \itemize{
+#'   \item With subfolders: \code{output_dir/plate_name/DRC_construct_compound.png}
+#'   \item Without subfolders: \code{output_dir/DRC_construct_compound_plate.png}
+#' }
+#'
+#' \strong{Error Handling:} The function continues processing even if individual plots fail,
+#' recording failures in the return object and optionally printing warnings.
 #'
 #' @examples
 #' \dontrun{
-#' # Basic usage
-#' batch_save_all_drc_plots(my_batch_results)
+#' # 1. Save all plots with default settings
+#' batch_save_all_drc_plots(batch_drc_results)
 #'
-#' # Customize output with higher resolution, no subfolders, and specific colors
+#' # 2. Save only specific plates as PDFs
 #' batch_save_all_drc_plots(
-#'   batch_drc_results = my_batch_results,
-#'   output_dir = "Final_Plots",
+#'   batch_drc_results,
+#'   plates_to_process = c("Plate1", "Plate2"),
+#'   file_extension = "pdf",
+#'   overwrite = TRUE
+#' )
+#'
+#' # 3. Customize plot appearance and organization
+#' batch_save_all_drc_plots(
+#'   batch_drc_results,
+#'   output_dir = "Figures/DRC_Curves",
 #'   create_subfolders = FALSE,
-#'   plot_dpi = 600,
-#'   colors = c("black", "red"),
-#'   show_IC50 = TRUE
+#'   file_prefix = "Curve",
+#'   y_limits = c(0, 150),
+#'   colors = "viridis",
+#'   plot_width = 10,
+#'   plot_height = 6,
+#'   plot_dpi = 300
+#' )
+#'
+#' # 4. Exclude specific compounds and show legend
+#' batch_save_all_drc_plots(
+#'   batch_drc_results,
+#'   compounds_to_exclude = c("DMSO", "Control"),
+#'   show_legend = TRUE,
+#'   verbose = FALSE
 #' )
 #' }
 #'
+#' @seealso
+#' \code{\link{plot_drc_batch}} for individual plot generation
+#' \code{\link{batch_drc_analysis}} for generating batch DRC results
+#'
+#' @importFrom ggplot2 ggsave
+#' @importFrom dplyr bind_rows
 #' @export
-
-
-
-
-
-
 batch_save_all_drc_plots <- function(batch_drc_results,
                                      output_dir = "DRC_Plots",
                                      create_subfolders = TRUE,
@@ -92,19 +107,22 @@ batch_save_all_drc_plots <- function(batch_drc_results,
                                      ...) {
 
   # ============================================================================
-  # 1. SETUP & EXTRACTION
+  # 1. SETUP AND DATA EXTRACTION
   # ============================================================================
-  if (!requireNamespace("ggplot2", quietly = TRUE)) stop("Package 'ggplot2' is required")
-  if (!requireNamespace("dplyr", quietly = TRUE)) stop("Package 'dplyr' is required")
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("Package 'ggplot2' is required")
+  }
+  if (!requireNamespace("dplyr", quietly = TRUE)) {
+    stop("Package 'dplyr' is required")
+  }
 
-  # --- AJUSTE 1: Extração robusta do objeto de análise (Wrapper) ---
+  # Extract drc_results if a wrapper object is provided
   if (is.list(batch_drc_results) && "drc_results" %in% names(batch_drc_results)) {
     if (verbose) message("Detected analysis wrapper object. Extracting 'drc_results'...")
-    # Trabalhamos apenas com a lista de resultados interna
     batch_drc_results <- batch_drc_results$drc_results
   }
 
-  # Helper: Nome de arquivo seguro
+  # Helper function for safe filename generation
   make_safe_filename <- function(string) {
     if (is.null(string) || is.na(string)) return("unknown")
     s <- gsub("[^[:alnum:]]+", "_", string)
@@ -112,9 +130,10 @@ batch_save_all_drc_plots <- function(batch_drc_results,
     return(s)
   }
 
-  # --- AJUSTE 2: Helper para buscar resultados onde quer que estejam ---
+  # Helper to extract detailed results from plate objects
   get_detailed_results <- function(plate_obj) {
     if (is.null(plate_obj$drc_result)) return(NULL)
+    # Try different possible locations for results
     res <- plate_obj$drc_result$detailed_results
     if (is.null(res)) res <- plate_obj$drc_result$curve_results
     if (is.null(res)) res <- plate_obj$drc_result$fits
@@ -123,35 +142,38 @@ batch_save_all_drc_plots <- function(batch_drc_results,
   }
 
   # ============================================================================
-  # 2. EXTRACT COMBINATIONS TO PLOT
+  # 2. EXTRACT VALID CONSTRUCT-COMPOUND COMBINATIONS
   # ============================================================================
   extract_combinations <- function(batch_results) {
     combos_list <- list()
     all_plates <- names(batch_results)
 
-    target_plates <- if (!is.null(plates_to_process)) intersect(all_plates, plates_to_process) else all_plates
+    # Filter plates if specified
+    target_plates <- if (!is.null(plates_to_process)) {
+      intersect(all_plates, plates_to_process)
+    } else {
+      all_plates
+    }
 
     for (plate_name in target_plates) {
-      # Usa o helper robusto aqui
       plate_res_list <- get_detailed_results(batch_results[[plate_name]])
-
       if (is.null(plate_res_list)) next
 
       for (i in seq_along(plate_res_list)) {
         res <- plate_res_list[[i]]
 
-        # Verifica sucesso (compatível com nova estrutura)
+        # Check if fit was successful
         has_success <- !is.null(res$success) && isTRUE(res$success)
         if (!has_success) next
 
-        # Parsing seguro do nome
+        # Parse construct and compound names
         info <- tryCatch({
           raw_name <- res$compound
           if (is.null(raw_name)) raw_name <- paste0("Unknown_", i)
 
           clean <- trimws(gsub("\\.\\d+$", "", raw_name))
 
-          # Lógica para Target:Compound ou Target | Compound
+          # Handle "Construct | Compound" format
           if (grepl(" \\| ", clean)) {
             parts <- strsplit(clean, " \\| ")[[1]]
             clean <- parts[1]
@@ -160,25 +182,30 @@ batch_save_all_drc_plots <- function(batch_drc_results,
           parts <- strsplit(clean, ":")[[1]]
           parts <- trimws(parts)
 
-          if(length(parts) >= 2) {
-            list(const = parts[1], comp = parts[2])
+          if (length(parts) >= 2) {
+            list(construct = parts[1], compound = parts[2])
           } else {
-            list(const = parts[1], comp = parts[1])
+            list(construct = parts[1], compound = parts[1])
           }
-        }, error = function(e) list(const = "Unknown", comp = "Unknown"))
+        }, error = function(e) {
+          list(construct = "Unknown", compound = "Unknown")
+        })
 
-        if (!is.null(compounds_to_exclude) && info$comp %in% compounds_to_exclude) next
+        # Skip excluded compounds
+        if (!is.null(compounds_to_exclude) && info$compound %in% compounds_to_exclude) {
+          next
+        }
 
         combos_list[[length(combos_list) + 1]] <- data.frame(
           plate = plate_name,
-          construct = info$const,
-          compound = info$comp,
-          # Chave única para o plot_drc_batch encontrar o dado específico
-          construct_compound = paste(info$const, info$comp, sep = ":"),
+          construct = info$construct,
+          compound = info$compound,
+          construct_compound = paste(info$construct, info$compound, sep = ":"),
           stringsAsFactors = FALSE
         )
       }
     }
+
     if (length(combos_list) == 0) return(NULL)
     return(dplyr::bind_rows(combos_list))
   }
@@ -192,19 +219,23 @@ batch_save_all_drc_plots <- function(batch_drc_results,
   }
 
   # ============================================================================
-  # 3. SETUP DIRECTORIES
+  # 3. SETUP OUTPUT DIRECTORY STRUCTURE
   # ============================================================================
-  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
+  }
 
   if (create_subfolders) {
-    for (p in unique(combos_df$plate)) {
-      p_path <- file.path(output_dir, make_safe_filename(p))
-      if (!dir.exists(p_path)) dir.create(p_path, recursive = TRUE)
+    for (plate in unique(combos_df$plate)) {
+      plate_path <- file.path(output_dir, make_safe_filename(plate))
+      if (!dir.exists(plate_path)) {
+        dir.create(plate_path, recursive = TRUE)
+      }
     }
   }
 
   # ============================================================================
-  # 4. GENERATE PLOTS
+  # 4. GENERATE AND SAVE PLOTS
   # ============================================================================
   total_plots <- nrow(combos_df)
   successes <- 0
@@ -215,50 +246,47 @@ batch_save_all_drc_plots <- function(batch_drc_results,
     pb <- txtProgressBar(min = 0, max = total_plots, style = 3)
   }
 
-  for (i in 1:total_plots) {
+  for (i in seq_len(total_plots)) {
     combo <- combos_df[i, ]
 
     safe_construct <- make_safe_filename(combo$construct)
-    safe_compound  <- make_safe_filename(combo$compound)
-    safe_plate     <- make_safe_filename(combo$plate)
+    safe_compound <- make_safe_filename(combo$compound)
+    safe_plate <- make_safe_filename(combo$plate)
 
-    # Nome do arquivo
-    fname <- sprintf("%s_%s_%s.%s", file_prefix, safe_construct, safe_compound, file_extension)
-
-    # Caminho completo
+    # Generate filename
     if (create_subfolders) {
-      output_path <- file.path(output_dir, safe_plate, fname)
+      filename <- sprintf("%s_%s_%s.%s", file_prefix, safe_construct, safe_compound, file_extension)
+      output_path <- file.path(output_dir, safe_plate, filename)
     } else {
-      fname_flat <- sprintf("%s_%s_%s_%s.%s", file_prefix, safe_construct, safe_compound, safe_plate, file_extension)
-      output_path <- file.path(output_dir, fname_flat)
+      filename <- sprintf("%s_%s_%s_%s.%s", file_prefix, safe_construct, safe_compound, safe_plate, file_extension)
+      output_path <- file.path(output_dir, filename)
     }
 
-    # Verifica overwrite
+    # Skip if file exists and overwrite is FALSE
     if (file.exists(output_path) && !overwrite) {
       if (verbose) setTxtProgressBar(pb, i)
       next
     }
 
-    # Tenta plotar
+    # Generate and save plot
     tryCatch({
       suppressMessages({
-        # Passamos a lista 'unwrapped' batch_drc_results aqui
-        # Como plot_drc_batch já é robusta, ela vai funcionar bem
         plot_drc_batch(
           batch_drc_results = batch_drc_results,
-          target_compound = combo$construct_compound, # Passa a chave "Target:Compound"
+          construct_compound = combo$construct_compound,
           save_plot = output_path,
           verbose = FALSE,
           show_legend = show_legend,
-          plot_title = combo$compound, # Força o título simples (Nome do composto)
+          plot_title = combo$compound,
           ...
         )
       })
       successes <- successes + 1
     }, error = function(e) {
       failures <- failures + 1
-      # Opcional: imprimir erro se falhar muito
-      # warning(paste("Failed:", output_path, "-", e$message))
+      if (verbose) {
+        warning(sprintf("Failed to plot %s: %s", combo$construct_compound, e$message))
+      }
     })
 
     if (verbose) setTxtProgressBar(pb, i)
@@ -266,9 +294,17 @@ batch_save_all_drc_plots <- function(batch_drc_results,
 
   if (verbose) {
     close(pb)
-    message("\nDone! Success: ", successes, " | Failed: ", failures)
-    message("Plots saved in: ", output_dir)
+    message("\nComplete! Successful: ", successes, " | Failed: ", failures)
+    message("Plots saved to: ", normalizePath(output_dir))
   }
 
-  return(invisible(list(total = total_plots, success = successes, failed = failures)))
+  # ============================================================================
+  # 5. RETURN SUMMARY
+  # ============================================================================
+  return(invisible(list(
+    total = total_plots,
+    success = successes,
+    failed = failures,
+    output_dir = output_dir
+  )))
 }

@@ -6,7 +6,7 @@
 \usage{
 plot_drc_batch(
   batch_drc_results,
-  target_compound = NULL,
+  construct_compound = NULL,
   position = NULL,
   y_limits = NULL,
   colors = NULL,
@@ -36,13 +36,14 @@ plot_drc_batch(
 }
 \arguments{
 \item{batch_drc_results}{A named list containing the results of the DRC batch analysis.
-Structure expected: \code{list(plate_name = list(drc_result = list(detailed_results = ...)))}.}
+Structure expected: \code{list(plate_name = list(drc_result = list(detailed_results = ...)))}.
+Can also accept a wrapper object from \code{batch_drc_analysis()} which contains a \code{drc_results} element.}
 
-\item{target_compound}{Character string. The specific target/compound to plot.
+\item{construct_compound}{Character string. The specific construct/compound to plot.
 Supports two formats:
 \itemize{
-\item \strong{"Target:Compound"}: Performs an exact match (e.g., "PAK3:IPA-3").
-\item \strong{"SearchString"}: Performs a fuzzy search across targets and compounds (e.g., "IPA-3").
+\item \strong{"Construct:Compound"}: Performs an exact match (e.g., "PAK3:IPA-3").
+\item \strong{"SearchString"}: Performs a fuzzy search across constructs and compounds (e.g., "IPA-3").
 }
 Ignored if \code{position} is provided.}
 
@@ -50,16 +51,23 @@ Ignored if \code{position} is provided.}
 Useful for iterating through compounds blindly.}
 
 \item{y_limits}{Numeric vector of length 2 (e.g., \code{c(0, 150)}). Sets the Y-axis limits.
+Applied using \code{coord_cartesian()} to maintain all data points (no filtering).
 If \code{NULL} (default), limits are automatic.
 \emph{Note:} Ignored if \code{facet_scales} contains "free".}
 
-\item{colors}{Character vector or string. Controls the line/point colors.
+\item{colors}{Character vector or string. Controls the line/point colors. Accepts:
 \itemize{
-\item \strong{Manual}: A vector of color codes/names (e.g., \code{c("red", "blue")}).
-\item \strong{Scientific Palettes (ggsci)}: "npg", "aaas", "nejm", "lancet", "jama", "jco", "ucscgb", "d3".
-\item \strong{Perceptual Palettes (viridis)}: "viridis", "magma", "plasma", "inferno", "cividis", "turbo".
-\item \strong{RColorBrewer}: Names like "Set1", "Dark2", "Paired".
-}}
+\item \strong{Manual colors}: A vector of color codes/names (e.g., \code{c("red", "blue")}).
+\item \strong{Single color name}: Any valid R color name (e.g., "red", "blue", "darkgreen").
+\item \strong{Viridis palettes}: "viridis", "magma", "plasma", "inferno", "cividis", "turbo", "rocket", "mako".
+Requires \code{viridisLite} package.
+\item \strong{RColorBrewer palettes}: Names like "Set1", "Set2", "Set3", "Pastel1", "Pastel2",
+"Paired", "Dark2", "Accent". Requires \code{RColorBrewer} package.
+\item \strong{ggsci palettes}: "jama", "nature" (npg), "lancet", "nejm", "aaas", "d3", "locuszoom",
+"igv", "uchicago", "startrek", "tron", "futurama", "rickandmorty", "simpsons", "gsea".
+Requires \code{ggsci} package.
+}
+Palettes are automatically interpolated if more colors are needed than the palette provides.}
 
 \item{point_shapes}{Integer vector. Custom shapes for points (0-25). Used only if \code{shape_by_duplicate = TRUE}.}
 
@@ -80,7 +88,7 @@ Common options: "sans" (Arial/Helvetica), "serif" (Times New Roman), "mono" (Cou
 For custom fonts, use the \code{extrafont} package.}
 
 \item{facet_by}{Character. Variable to split the plot into panels.
-Options: \code{"compound"}, \code{"target"}, \code{"plate"}. Default is \code{NULL} (single plot).}
+Options: \code{"compound"}, \code{"construct"}, \code{"plate"}. Default is \code{NULL} (single plot).}
 
 \item{facet_ncol}{Integer. Number of columns for the faceted grid.}
 
@@ -90,30 +98,27 @@ Options: \code{"fixed"} (default), \code{"free"}, \code{"free_y"}, \code{"free_x
 \item{save_plot}{Character string. File path to save the plot (e.g., "plot.png", "plot.pdf").
 If \code{NULL}, the plot is not saved automatically.}
 
-\item{plot_width}{Numeric. Width of the saved plot in inches.}
+\item{plot_width}{Numeric. Width of the saved plot in inches (default: 12).}
 
-\item{plot_height}{Numeric. Height of the saved plot in inches.}
+\item{plot_height}{Numeric. Height of the saved plot in inches (default: 8).}
 
 \item{plot_dpi}{Integer. Resolution of the saved plot (default: 600).}
 
 \item{plot_title}{Character. Custom main title. If \code{NULL}, generates a smart title based on selection.}
 
-\item{legend_title}{Character. Custom legend title.}
+\item{legend_title}{Character. Custom legend title. If \code{NULL}, generates based on data.}
 
-\item{y_axis_title}{Character. Custom Y-axis title. Default is "BRET ratio".}
+\item{y_axis_title}{Character. Custom Y-axis title. Default is "Response".}
 
-\item{verbose}{Logical. If \code{TRUE}, prints progress messages and IC50 tables to the console.}
+\item{verbose}{Logical. If \code{TRUE} (default), prints progress messages to the console.}
 
-\item{axis_text_color}{Character. Color of axis tick labels.}
+\item{axis_text_color}{Character. Color of axis tick labels (default: "black").}
 
-\item{axis_text_size}{Numeric. Size of axis tick labels.}
+\item{axis_text_size}{Numeric. Size of axis tick labels (default: 12).}
 
-\item{axis_title_color}{Character. Color of axis titles.}
+\item{axis_title_color}{Character. Color of axis titles (default: "black").}
 
-\item{axis_title_size}{Numeric. Size of axis titles.}
-
-\item{show_IC50}{Logical. If \code{TRUE}, extracts the IC50/EC50 from the model and displays it
-in the plot legend. Also prints a summary table to the console.}
+\item{axis_title_size}{Numeric. Size of axis titles (default: 14).}
 }
 \value{
 A \code{ggplot2} object. This allows further modification using standard ggplot syntax
@@ -123,45 +128,67 @@ A \code{ggplot2} object. This allows further modification using standard ggplot 
 This function generates publication-quality Dose-Response Curve (DRC) plots from a list of
 batch processing results. It handles data extraction, statistical aggregation, and visualization
 in a single step. It supports advanced features like scientific color palettes, faceting,
-automatic IC50/EC50 annotation, and custom styling.
+and custom styling.
 }
 \details{
 \strong{Data Extraction:} The function iterates through the nested list structure of \code{batch_drc_results},
-extracting raw data points and model predictions for valid fits.
+extracting raw data points and model predictions for valid fits. Curve predictions are generated
+only within the range of experimental data (no extrapolation).
 
-\strong{IC50 Extraction:} The function attempts to extract the IC50/EC50 parameter (usually 'e')
-from the underlying \code{drc} model object. This value is displayed in the console and optionally in the legend.
+\strong{Curve Behavior:} Model curves are plotted only within the concentration range of the
+experimental data for each curve, avoiding extrapolation beyond measured points.
+
+\strong{Error Bars:} When multiple replicates exist at the same concentration, error bars
+represent mean ± standard deviation.
 
 \strong{Faceting vs. Limits:} If \code{facet_scales} is set to "free" or "free_y", the global \code{y_limits}
 argument will be ignored to allow each panel to scale independently.
+
+\strong{Automatic Title Generation:} When \code{plot_title = NULL}, the function generates
+appropriate titles:
+\itemize{
+\item Single compound: Compound name
+\item Multiple compounds, single construct: Construct name
+\item Multiple compounds, single compound name: Compound name
+\item Otherwise: "Comparative DRC Analysis"
+}
 }
 \examples{
 \dontrun{
 # 1. Basic usage: Plot specific compound by name
-plot_drc_batch(results, target_compound = "PAK3:IPA-3")
+plot_drc_batch(results, construct_compound = "PAK3:IPA-3")
 
 # 2. Search fuzzy match and use JAMA colors
-plot_drc_batch(results, target_compound = "IPA-3", colors = "jama")
+plot_drc_batch(results, construct_compound = "IPA-3", colors = "jama")
 
 # 3. Plot by position (e.g., the 5th compound found)
 plot_drc_batch(results, position = 5)
 
 # 4. Facet by compound (compare multiple compounds side-by-side)
 plot_drc_batch(results,
-               target_compound = "PAK3",
+               construct_compound = "PAK3",
                facet_by = "compound",
                facet_ncol = 3)
 
-# 5. Show IC50 in legend and use Times New Roman
+# 5. Custom styling with y-limits and viridis palette
 plot_drc_batch(results,
-               target_compound = "TargetA:CompB",
-               show_IC50 = TRUE,
-               font_family = "serif")
+               construct_compound = "ConstructA:CompB",
+               colors = "viridis",
+               y_limits = c(0, 150),
+               font_family = "serif",
+               show_grid = FALSE)
+
+# 6. Save plot automatically
+plot_drc_batch(results,
+               construct_compound = "PAK4:MRIA-9",
+               save_plot = "PAK4_MRIA9_DRC.png",
+               plot_width = 10,
+               plot_height = 6)
 }
 
 }
 \seealso{
 \code{\link{batch_drc_analysis}} for generating batch DRC results
-\code{\link{plot_biological_replicates}} for comparing biological replicates
+\code{\link{batch_save_all_drc_plots}} for automatically saving all DRC plots
 \code{\link[ggplot2]{ggplot}} for underlying plotting functionality
 }

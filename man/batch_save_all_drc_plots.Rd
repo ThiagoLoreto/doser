@@ -2,7 +2,7 @@
 % Please edit documentation in R/batch_save_all_drc_plots.R
 \name{batch_save_all_drc_plots}
 \alias{batch_save_all_drc_plots}
-\title{Batch Save All DRC Plots}
+\title{Save All Dose-Response Curves from Batch Analysis Results}
 \usage{
 batch_save_all_drc_plots(
   batch_drc_results,
@@ -19,87 +19,106 @@ batch_save_all_drc_plots(
 )
 }
 \arguments{
-\item{batch_drc_results}{A list containing the results of a batch DRC analysis.
-The structure is expected to be a list of plates, where each plate contains
-\code{drc_result$detailed_results}.}
+\item{batch_drc_results}{A named list containing the results of the DRC batch analysis.
+Structure expected: \code{list(plate_name = list(drc_result = list(detailed_results = ...)))}.
+Can also accept a wrapper object from \code{batch_drc_analysis()} which contains a \code{drc_results} element.}
 
-\item{output_dir}{Character string. The main directory where plots will be saved.
-Defaults to "DRC_Plots". The directory is created if it does not exist.}
+\item{output_dir}{Character. Directory where plots will be saved (default: "DRC_Plots").
+Created if it doesn't exist.}
 
-\item{create_subfolders}{Logical. If \code{TRUE} (default), creates a subfolder
-for each plate within \code{output_dir}. If \code{FALSE}, all plots are saved
-directly in \code{output_dir} with the plate name appended to the filename to prevent duplicates.}
+\item{create_subfolders}{Logical. If \code{TRUE} (default), creates separate subfolders for each plate.
+If \code{FALSE}, all plots are saved directly in \code{output_dir}.}
 
-\item{file_prefix}{Character string. A prefix added to the start of every filename.
-Defaults to "DRC".}
+\item{file_prefix}{Character. Prefix for all saved files (default: "DRC").}
 
-\item{file_extension}{Character string. The file format/extension for the saved plots
-(e.g., "png", "pdf", "svg", "tiff"). Defaults to "png".}
+\item{file_extension}{Character. File format extension (default: "png").
+Other options: "pdf", "jpg", "tiff", "svg".}
 
-\item{overwrite}{Logical. If \code{TRUE}, existing files with the same name will be overwritten.
-If \code{FALSE} (default), existing files are skipped to save time.}
+\item{overwrite}{Logical. If \code{TRUE}, overwrites existing files. If \code{FALSE} (default),
+skips files that already exist.}
 
-\item{plates_to_process}{Character vector (optional). A list of specific plate names
-(keys in \code{batch_drc_results}) to process. If \code{NULL} (default), all plates are processed.}
+\item{plates_to_process}{Character vector. Specific plate names to process.
+If \code{NULL} (default), processes all plates.}
 
-\item{compounds_to_exclude}{Character vector (optional). A list of compound names
-to exclude from plotting. Matches against the parsed compound name.}
+\item{compounds_to_exclude}{Character vector. Compound names to exclude from plotting.
+Useful for removing controls or failed compounds.}
 
-\item{verbose}{Logical. If \code{TRUE} (default), displays a progress bar and
-summary statistics (success/failure counts) in the console.}
+\item{verbose}{Logical. If \code{TRUE} (default), prints progress messages to the console.}
 
-\item{show_legend}{Logical. Whether to display the legend in the generated plots.
-Defaults to \code{FALSE} for batch processing to save space or keep plots clean.
-Can be overridden to \code{TRUE} if needed.}
+\item{show_legend}{Logical. If \code{TRUE}, displays legend in plots. If \code{FALSE} (default),
+omits legend for cleaner individual plots.}
 
-\item{...}{Additional arguments passed directly to the underlying \code{plot_drc_batch} function
-and/or the plot saving mechanism. Common useful arguments include:
-\itemize{
-\item \code{plot_width}: Width of the output image (in inches).
-\item \code{plot_height}: Height of the output image (in inches).
-\item \code{plot_dpi}: Resolution (e.g., 300).
-\item \code{y_limits}: A numeric vector of length 2 (e.g., \code{c(0, 1.5)}).
-\item \code{colors}: A vector of colors for the curves.
-\item \code{show_IC50}: Logical, to display the IC50 value on the plot.
-}}
+\item{...}{Additional arguments passed to \code{\link{plot_drc_batch}}.
+Common options: \code{y_limits}, \code{colors}, \code{plot_width}, \code{plot_height}, etc.}
 }
 \value{
-An invisible list containing processing statistics:
+An invisible list containing:
 \itemize{
-\item \code{total}: Total number of plots attempted.
-\item \code{success}: Number of successfully saved plots.
-\item \code{failed}: Number of failed plots.
+\item \code{total}: Total number of plots attempted
+\item \code{success}: Number of successfully saved plots
+\item \code{failed}: Number of failed plots
+\item \code{output_dir}: Path where plots were saved
 }
 }
 \description{
-This function extracts all successful models from the provided \code{batch_drc_results} list,
-parses the construct and compound names, sanitizes them for file creation, and saves
-the corresponding plots. It supports creating subfolders per plate, filtering specific plates,
-and excluding specific compounds.
+This function automatically generates and saves Dose-Response Curve (DRC) plots for all
+successful fits found in batch analysis results. It creates a systematic file structure
+and handles naming, organization, and error management.
 }
 \details{
-Automatically iterates through a batch of Dose-Response Curve (DRC) analysis results,
-generates plots for all valid construct-compound combinations, and saves them to a specified directory.
+This function scans through all batch DRC results, identifies successful fits,
+and generates individual plots for each construct-compound combination.
 
-The function uses a robust sanitization method to ensure filenames do not contain
-illegal characters (converting special characters to underscores).
-It assumes the compound names in the results are formatted as "Construct | Compound"
-or "Construct:Compound".
+\strong{Filename Generation:} Files are named using the pattern:
+\code{[prefix]_[construct]_[compound].[extension]} (with plate subfolders if enabled).
+Special characters are replaced with underscores for compatibility.
+
+\strong{File Organization:}
+\itemize{
+\item With subfolders: \code{output_dir/plate_name/DRC_construct_compound.png}
+\item Without subfolders: \code{output_dir/DRC_construct_compound_plate.png}
+}
+
+\strong{Error Handling:} The function continues processing even if individual plots fail,
+recording failures in the return object and optionally printing warnings.
 }
 \examples{
 \dontrun{
-# Basic usage
-batch_save_all_drc_plots(my_batch_results)
+# 1. Save all plots with default settings
+batch_save_all_drc_plots(batch_drc_results)
 
-# Customize output with higher resolution, no subfolders, and specific colors
+# 2. Save only specific plates as PDFs
 batch_save_all_drc_plots(
-  batch_drc_results = my_batch_results,
-  output_dir = "Final_Plots",
+  batch_drc_results,
+  plates_to_process = c("Plate1", "Plate2"),
+  file_extension = "pdf",
+  overwrite = TRUE
+)
+
+# 3. Customize plot appearance and organization
+batch_save_all_drc_plots(
+  batch_drc_results,
+  output_dir = "Figures/DRC_Curves",
   create_subfolders = FALSE,
-  plot_dpi = 600,
-  colors = c("black", "red"),
-  show_IC50 = TRUE
+  file_prefix = "Curve",
+  y_limits = c(0, 150),
+  colors = "viridis",
+  plot_width = 10,
+  plot_height = 6,
+  plot_dpi = 300
+)
+
+# 4. Exclude specific compounds and show legend
+batch_save_all_drc_plots(
+  batch_drc_results,
+  compounds_to_exclude = c("DMSO", "Control"),
+  show_legend = TRUE,
+  verbose = FALSE
 )
 }
 
+}
+\seealso{
+\code{\link{plot_drc_batch}} for individual plot generation
+\code{\link{batch_drc_analysis}} for generating batch DRC results
 }
