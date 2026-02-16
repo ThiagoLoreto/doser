@@ -233,7 +233,6 @@
 #' @export
 
 
-
 batch_ratio_analysis <- function(directory = getwd(),
                                  control_0perc = NULL,
                                  control_100perc = NULL,
@@ -244,7 +243,8 @@ batch_ratio_analysis <- function(directory = getwd(),
                                  output_dir = NULL,
                                  generate_reports = TRUE,
                                  function_version = "v1",
-                                 verbose = TRUE) {
+                                 verbose = TRUE,
+                                 selected_columns = NULL) {
 
   # Validate function_version argument
   valid_versions <- c("v1", "v2")
@@ -264,6 +264,14 @@ batch_ratio_analysis <- function(directory = getwd(),
       message("  • Enhanced ratio_dose_response_v2 function")
       message("  • control_0perc: can be fixed value (e.g., 16) OR column name")
       message("  • control_100perc: can be column positions (e.g., c(12, 24)) OR column names")
+    }
+
+    # Mensagem sobre selected_columns
+    if (!is.null(selected_columns)) {
+      message("  • Selected columns: ", paste(selected_columns, collapse = ", "))
+      message("    (User view: 1 = first data column, excludes row names column)")
+    } else {
+      message("  • Selected columns: All data columns (1:24)")
     }
     message("================================")
   }
@@ -286,6 +294,7 @@ batch_ratio_analysis <- function(directory = getwd(),
       Sheet_Number = character(),
       Data_File = character(),
       Function_Version = character(),
+      Selected_Columns = character(),
       Status = character(),
       N_Constructs = integer(),
       Overall_Quality = character(),
@@ -300,6 +309,7 @@ batch_ratio_analysis <- function(directory = getwd(),
       n_constructs <- 0
       overall_quality <- "Not assessed"
       control_structure <- "Unknown"
+      selected_cols_info <- "All"
 
       # Get control structure information
       if (!is.null(plate_result$control_info)) {
@@ -309,6 +319,11 @@ batch_ratio_analysis <- function(directory = getwd(),
         } else {
           control_structure <- "Original columns"
         }
+      }
+
+      # Get selected columns information
+      if (!is.null(plate_result$selected_columns_info)) {
+        selected_cols_info <- plate_result$selected_columns_info$description
       }
 
       if (!is.null(plate_result$interval_means)) {
@@ -324,6 +339,7 @@ batch_ratio_analysis <- function(directory = getwd(),
         Sheet_Number = results[[plate_sheet]]$sheet_number,
         Data_File = results[[plate_sheet]]$data_file,
         Function_Version = results[[plate_sheet]]$function_version,
+        Selected_Columns = selected_cols_info,
         Status = "Completed",
         N_Constructs = n_constructs,
         Overall_Quality = overall_quality,
@@ -358,6 +374,9 @@ batch_ratio_analysis <- function(directory = getwd(),
           paste("Control 100%:", ifelse(is.numeric(results[[plate_sheet]]$control_100perc),
                                         paste("Positions", paste(results[[plate_sheet]]$control_100perc, collapse = ", ")),
                                         paste(results[[plate_sheet]]$control_100perc, collapse = ", "))),
+          paste("Selected columns:", ifelse(!is.null(results[[plate_sheet]]$selected_columns),
+                                            paste(results[[plate_sheet]]$selected_columns, collapse = ", "),
+                                            "All")),
           ""
         )
 
@@ -493,7 +512,8 @@ batch_ratio_analysis <- function(directory = getwd(),
           info_table = info_table,
           low_value_threshold = low_value_threshold,
           verbose = verbose,
-          save_to_excel = NULL
+          save_to_excel = NULL,
+          selected_columns = selected_columns
         )
       } else {
         # Use enhanced v2 function
@@ -505,7 +525,8 @@ batch_ratio_analysis <- function(directory = getwd(),
           info_table = info_table,
           low_value_threshold = low_value_threshold,
           verbose = verbose,
-          save_to_excel = NULL
+          save_to_excel = NULL,
+          selected_columns = selected_columns
         )
       }
 
@@ -600,7 +621,27 @@ batch_ratio_analysis <- function(directory = getwd(),
           openxlsx::addStyle(wb, "Control_Info", header_style, rows = 1, cols = 1:2)
         }
 
-        # 6. Processing Info sheet
+        # 6. Selected Columns Info sheet
+        if (!is.null(result$selected_columns_info)) {
+          openxlsx::addWorksheet(wb, "Selected_Columns_Info")
+
+          selected_cols_df <- data.frame(
+            Parameter = names(result$selected_columns_info),
+            Value = sapply(result$selected_columns_info, function(x) {
+              if (is.null(x)) return("NULL")
+              if (length(x) == 0) return("Empty")
+              if (is.character(x)) return(x)
+              if (is.numeric(x)) return(paste(x, collapse = ", "))
+              return(as.character(x))
+            }),
+            stringsAsFactors = FALSE
+          )
+
+          openxlsx::writeData(wb, "Selected_Columns_Info", selected_cols_df)
+          openxlsx::addStyle(wb, "Selected_Columns_Info", header_style, rows = 1, cols = 1:2)
+        }
+
+        # 7. Processing Info sheet
         openxlsx::addWorksheet(wb, "Processing_Info")
 
         processing_info <- data.frame(
@@ -610,6 +651,7 @@ batch_ratio_analysis <- function(directory = getwd(),
             "Function Version",
             "Control 0%",
             "Control 100%",
+            "Selected Columns",
             "Split Replicates",
             "Low Value Threshold",
             "Processing Date"
@@ -625,6 +667,9 @@ batch_ratio_analysis <- function(directory = getwd(),
                    paste("Positions:", paste(control_100perc, collapse = ", ")),
                    ifelse(is.null(control_100perc), "Not specified",
                           paste(control_100perc, collapse = ", "))),
+            ifelse(is.null(selected_columns),
+                   "All columns",
+                   paste("Data columns:", paste(selected_columns, collapse = ", "))),
             split_replicates,
             low_value_threshold,
             as.character(Sys.time())
@@ -651,6 +696,7 @@ batch_ratio_analysis <- function(directory = getwd(),
         function_version = function_version,
         control_0perc = control_0perc,
         control_100perc = control_100perc,
+        selected_columns = selected_columns,
         result = result
       )
 

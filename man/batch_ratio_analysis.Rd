@@ -15,7 +15,8 @@ batch_ratio_analysis(
   output_dir = NULL,
   generate_reports = TRUE,
   function_version = "v1",
-  verbose = TRUE
+  verbose = TRUE,
+  selected_columns = NULL
 )
 }
 \arguments{

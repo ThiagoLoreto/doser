@@ -8,6 +8,7 @@ plot_drc_batch(
   batch_drc_results,
   construct_compound = NULL,
   position = NULL,
+  plates = NULL,
   y_limits = NULL,
   colors = NULL,
   point_shapes = NULL,
@@ -31,7 +32,10 @@ plot_drc_batch(
   axis_text_color = "black",
   axis_text_size = 12,
   axis_title_color = "black",
-  axis_title_size = 14
+  axis_title_size = 14,
+  title_size = 16,
+  legend_title_size = 12,
+  legend_text_size = 10
 )
 }
 \arguments{
@@ -49,6 +53,15 @@ Ignored if \code{position} is provided.}
 
 \item{position}{Integer. Selects a compound by its numerical index in the list of unique results.
 Useful for iterating through compounds blindly.}
+
+\item{plates}{Character vector or numeric vector. Specifies which plates to include in the plot.
+Options:
+\itemize{
+\item \code{NULL} (default): Include all plates
+\item Character vector: Plate names to include (e.g., \code{c("plate_01", "plate_02")})
+\item Numeric vector: Plate indices to include (e.g., \code{c(1, 3)} for first and third plates)
+}
+Useful for comparing specific replicates or excluding problematic plates.}
 
 \item{y_limits}{Numeric vector of length 2 (e.g., \code{c(0, 150)}). Sets the Y-axis limits.
 Applied using \code{coord_cartesian()} to maintain all data points (no filtering).
@@ -108,9 +121,10 @@ If \code{NULL}, the plot is not saved automatically.}
 
 \item{legend_title}{Character. Custom legend title. If \code{NULL}, generates based on data.}
 
-\item{y_axis_title}{Character. Custom Y-axis title. Default is "Response".}
+\item{y_axis_title}{Character. Custom Y-axis title.}
 
-\item{verbose}{Logical. If \code{TRUE} (default), prints progress messages to the console.}
+\item{verbose}{Logical. If \code{TRUE} (default), prints progress messages to the console,
+including which plates are being filtered when using the \code{plates} parameter.}
 
 \item{axis_text_color}{Character. Color of axis tick labels (default: "black").}
 
@@ -128,7 +142,7 @@ A \code{ggplot2} object. This allows further modification using standard ggplot 
 This function generates publication-quality Dose-Response Curve (DRC) plots from a list of
 batch processing results. It handles data extraction, statistical aggregation, and visualization
 in a single step. It supports advanced features like scientific color palettes, faceting,
-and custom styling.
+custom styling, and selective plotting of specific plates.
 }
 \details{
 \strong{Data Extraction:} The function iterates through the nested list structure of \code{batch_drc_results},
@@ -151,7 +165,11 @@ appropriate titles:
 \item Multiple compounds, single construct: Construct name
 \item Multiple compounds, single compound name: Compound name
 \item Otherwise: "Comparative DRC Analysis"
+The title does not indicate which plates are plotted when using the \code{plates} parameter.
 }
+
+\strong{Interoperability:} The function works seamlessly with results from \code{batch_drc_analysis()}
+and can handle both normalized and raw BRET ratio data automatically.
 }
 \examples{
 \dontrun{
@@ -166,24 +184,56 @@ plot_drc_batch(results, position = 5)
 
 # 4. Facet by compound (compare multiple compounds side-by-side)
 plot_drc_batch(results,
-               construct_compound = "PAK3",
-               facet_by = "compound",
-               facet_ncol = 3)
+construct_compound = "PAK3",
+facet_by = "compound",
+facet_ncol = 3)
 
 # 5. Custom styling with y-limits and viridis palette
 plot_drc_batch(results,
-               construct_compound = "ConstructA:CompB",
-               colors = "viridis",
-               y_limits = c(0, 150),
-               font_family = "serif",
-               show_grid = FALSE)
+construct_compound = "ConstructA:CompB",
+colors = "viridis",
+y_limits = c(0, 150),
+font_family = "serif",
+show_grid = FALSE)
 
 # 6. Save plot automatically
 plot_drc_batch(results,
-               construct_compound = "PAK4:MRIA-9",
-               save_plot = "PAK4_MRIA9_DRC.png",
-               plot_width = 10,
-               plot_height = 6)
+construct_compound = "PAK4:MRIA-9",
+save_plot = "PAK4_MRIA9_DRC.png",
+plot_width = 10,
+plot_height = 6)
+
+# 7. Plot specific plates only
+plot_drc_batch(results,
+construct_compound = "Target:CompoundX",
+plates = c("plate_01", "plate_03"))
+
+# 8. Show replicates with different shapes
+plot_drc_batch(results,
+construct_compound = "PAK3:IPA-3",
+shape_by_duplicate = TRUE,
+show_error_bars = TRUE)
+
+# 9. Hide legend and use custom axis styling
+plot_drc_batch(results,
+construct_compound = "ConstructA:CompoundB",
+show_legend = FALSE,
+axis_text_color = "darkblue",
+axis_title_color = "navy")
+
+# 10. Combine multiple parameters for publication-ready plot
+plot_drc_batch(results,
+construct_compound = "PAK3:IPA-3",
+colors = "jama",
+y_limits = c(0, 120),
+show_error_bars = TRUE,
+shape_by_duplicate = TRUE,
+font_family = "serif",
+show_grid = FALSE,
+save_plot = "Figure1_PAK3_IPA3.png",
+plot_width = 8,
+plot_height = 6,
+plot_dpi = 300)
 }
 
 }

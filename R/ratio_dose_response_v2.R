@@ -8,10 +8,10 @@
 #' @param data Data frame containing **raw dose-response experimental data** with specific
 #'   structure typically exported from plate readers. Must have at least 43 rows with
 #'   column names in row 9.
-#' @param control_0perc **Either** a single numeric value (e.g., 16) for fixed 0% control 
+#' @param control_0perc **Either** a single numeric value (e.g., 16) for fixed 0% control
 #'   **or** a character string specifying the column name for 0% control (background control).
 #'   When using fixed value, a new column 'Fixed_0perc' is created with this value.
-#' @param control_100perc **Either** a numeric vector of column positions (e.g., c(12, 24)) 
+#' @param control_100perc **Either** a numeric vector of column positions (e.g., c(12, 24))
 #'   **or** a character vector of column names for 100% control(s). When using multiple
 #'   columns, their row-wise means are calculated to create a new 'Mean_100perc' column.
 #' @param split_replicates Logical indicating whether to split experimental replicates
@@ -21,7 +21,7 @@
 #' @param save_to_excel Character string specifying Excel file path for saving processed results
 #'   (default: NULL, no saving).
 #' @param verbose Logical indicating whether to display progress messages (default: TRUE).
-#' @param low_value_threshold Numeric threshold for filtering low luciferase signals 
+#' @param low_value_threshold Numeric threshold for filtering low luciferase signals
 #'   (default: 3000). Values below this are replaced with NA.
 #'
 #' @return A list containing the following components:
@@ -164,7 +164,7 @@
 #' \preformatted{
 #'   Column 1:    log(inhibitor) concentration values (first row = NA)
 #'   Columns 2-n: Experimental constructs (with .2 suffix for second technical replicate)
-#'   
+#'
 #'   Row structure:
 #'   - Row 1:      0% control values (Fixed_0perc if using fixed-value mode)
 #'   - Rows 2-(n-1): Experimental concentration measurements
@@ -203,31 +203,179 @@ ratio_dose_response_v2 <- function(data,
                                    info_table = NULL,
                                    save_to_excel = NULL,
                                    verbose = TRUE,
-                                   low_value_threshold = 3000) {
-  
+                                   low_value_threshold = 3000,
+                                   selected_columns = NULL) {
+
   # --- DATA VALIDATION AND PREPARATION ---
   if (nrow(data) < 43) {
     stop("Data must have at least 43 rows")
   }
-  
+
   # Set column names from row 9 of data
   colnames(data) <- as.character(data[9, ])
-  
-  # Extract the two main subtables (luciferase and normalizer readings)
-  subtable1 <- data[10:25, 1:25]  # First measurement
-  subtable2 <- data[28:43, 1:25]  # Second measurement
-  
-  final_rownames <- subtable1[, 1]
-  
+
+  # Extract full subtables first
+  subtable1_full <- data[10:25, 1:25]  # First measurement (luciferase)
+  subtable2_full <- data[28:43, 1:25]  # Second measurement (normalizer)
+
+  final_rownames <- subtable1_full[, 1]
+
+  # Logic for selected_columns
+  if (!is.null(selected_columns)) {
+    # Validate selected_columns are numeric indices
+    if (!is.numeric(selected_columns)) {
+      stop("selected_columns must be numeric indices (e.g., c(2:23))")
+    }
+
+    # Adjust considering column 1 contains row names
+    data_columns_indices <- selected_columns + 1
+
+    # Validate indices are within bounds
+    if (max(data_columns_indices) > ncol(subtable1_full)) {
+      stop("Selected column index ", max(selected_columns),
+           " is out of bounds. Maximum allowed: ", ncol(subtable1_full) - 1)
+    }
+    if (min(data_columns_indices) < 2) {
+      stop("Selected column indices must be >= 1")
+    }
+
+    # Validate number of data columns is even
+    if (length(selected_columns) %% 2 != 0) {
+      warning("Number of selected data columns is not even (", length(selected_columns),
+              " columns selected). This may cause issues with split_replicates.")
+    }
+
+    # Always keep column 1 (row names) + selected data columns
+    columns_to_keep <- c(1, data_columns_indices)
+
+    # Apply column selection to both subtables
+    subtable1 <- subtable1_full[, columns_to_keep, drop = FALSE]
+    subtable2 <- subtable2_full[, columns_to_keep, drop = FALSE]
+
+  } else {
+    # If no selection, use all columns
+    subtable1 <- subtable1_full
+    subtable2 <- subtable2_full
+  }
+
   convert_to_numeric_df <- function(df, rownames_vec) {
     num_df <- as.data.frame(apply(df[, -1], 2, as.numeric))
     rownames(num_df) <- rownames_vec
     return(num_df)
   }
-  
+
   subtable1_num <- convert_to_numeric_df(subtable1, final_rownames)
   subtable2_num <- convert_to_numeric_df(subtable2, final_rownames)
-  
+
+  # Map controls to adjust indices
+  map_control_input <- function(control_spec, is_for_0perc = FALSE) {
+    if (is.null(control_spec)) return(NULL)
+
+    if (is.numeric(control_spec) && length(control_spec) == 1) {
+      # For control_0perc: if numeric, it's a fixed value
+      if (is_for_0perc) {
+        return(list(type = "value", value = control_spec, column_index = NA, column_name = NA))
+      }
+
+      # For control_100perc: if numeric, it's a data column index
+      # Adjust to actual index
+      actual_col_index <- control_spec + 1
+
+      # Check if exists in original data
+      if (actual_col_index > ncol(data)) {
+        stop("Control column index ", control_spec, " is out of bounds. ",
+             "Maximum allowed: ", ncol(data) - 1)
+      }
+
+      # Get column name
+      col_name <- as.character(data[9, actual_col_index])
+      return(list(type = "column", value = NULL, column_index = actual_col_index, column_name = col_name))
+
+    } else if (is.character(control_spec) && length(control_spec) == 1) {
+      # Column name provided
+      return(list(type = "column", value = NULL, column_index = which(colnames(data) == control_spec)[1],
+                  column_name = control_spec))
+    } else if (is.numeric(control_spec) && length(control_spec) > 1) {
+      # Multiple positions for control_100perc
+      # Adjust indices
+      actual_indices <- control_spec + 1
+
+      # Check if they exist
+      if (max(actual_indices) > ncol(data)) {
+        stop("Control column indices out of bounds. Maximum allowed: ", ncol(data) - 1)
+      }
+
+      # Get column names
+      col_names <- as.character(data[9, actual_indices])
+      return(list(type = "columns", value = NULL, column_indices = actual_indices, column_names = col_names))
+    } else {
+      if (is_for_0perc) {
+        stop("control_0perc must be either a single numeric value or a single column name")
+      } else {
+        stop("control_100perc must be either numeric positions or character column names")
+      }
+    }
+  }
+
+  # --- CONTROL ARGUMENT PROCESSING ---
+  # Process control_0perc
+  control_0_info <- map_control_input(control_0perc, is_for_0perc = TRUE)
+
+  # Determine if control_0perc is a fixed value
+  control_0_is_value <- FALSE
+  control_0_value <- NULL
+
+  if (!is.null(control_0_info)) {
+    if (control_0_info$type == "value") {
+      control_0_is_value <- TRUE
+      control_0_value <- control_0_info$value
+      if (verbose) message("Using fixed value ", control_0_value, " for 0% control")
+    } else if (control_0_info$type == "column") {
+      control_0_is_value <- FALSE
+      if (verbose) message("Using column '", control_0_info$column_name, "' for 0% control")
+
+      # Check if column is in selected columns
+      if (!is.null(selected_columns) && !control_0_info$column_name %in% colnames(subtable1_num)) {
+        stop("Control column '", control_0_info$column_name, "' not found in selected columns.")
+      }
+    }
+  }
+
+  # Process control_100perc
+  control_100_info <- map_control_input(control_100perc, is_for_0perc = FALSE)
+
+  # Extract 100% control information
+  using_positions <- FALSE
+  control_100_positions <- NULL
+  control_100_names <- NULL
+
+  if (!is.null(control_100_info)) {
+    if (control_100_info$type %in% c("column", "columns")) {
+      if (control_100_info$type == "column") {
+        control_100_names <- control_100_info$column_name
+
+        # Check if column is in selected columns
+        if (!is.null(selected_columns) && !control_100_names %in% colnames(subtable1_num)) {
+          stop("Control column '", control_100_names, "' not found in selected columns.")
+        }
+
+      } else {  # "columns"
+        control_100_names <- control_100_info$column_names
+
+        # Check if columns are in selected columns
+        missing_cols <- control_100_names[!control_100_names %in% colnames(subtable1_num)]
+        if (length(missing_cols) > 0 && !is.null(selected_columns)) {
+          stop("Control columns not found in selected columns: ", paste(missing_cols, collapse = ", "))
+        }
+      }
+
+      if (verbose && length(control_100_names) > 1) {
+        message("Using column names for 100% control: ",
+                paste(control_100_names, collapse = ", "))
+      }
+    }
+  }
+
   # Filter out low luciferase values (potential background noise)
   replace_low_values <- function(df, threshold = low_value_threshold) {
     for (col in colnames(df)) {
@@ -240,82 +388,40 @@ ratio_dose_response_v2 <- function(data,
     }
     return(df)
   }
-  
+
   subtable1_num <- replace_low_values(subtable1_num)
-  
+
   if (any(subtable1_num == 0, na.rm = TRUE)) {
     warning("Division by zero detected in ratio calculation - replacing with NA")
     subtable1_num[subtable1_num == 0] <- NA
   }
-  
+
   # --- CORE CALCULATION: RATIO ---
   # Calculate ratio: (subtable2 / subtable1) * 1000
   ratio <- (subtable2_num / subtable1_num) * 1000
-  
+
   ratio_modified <- ratio  # Copy for modifications
-  
+
   result <- list()
-  
-  # --- CONTROL ARGUMENT PROCESSING ---
-  # Determine if control_0perc is a fixed value or column name
-  control_0_is_value <- FALSE
-  control_0_value <- NULL
-  
-  if (!is.null(control_0perc)) {
-    if (is.numeric(control_0perc) && length(control_0perc) == 1) {
-      control_0_is_value <- TRUE
-      control_0_value <- control_0perc
-      if (verbose) message("Using fixed value ", control_0_value, " for 0% control")
-    } else if (is.character(control_0perc) && length(control_0perc) == 1) {
-      control_0_is_value <- FALSE
-      if (verbose) message("Using column '", control_0perc, "' for 0% control")
-    } else {
-      stop("control_0perc must be either a single numeric value or a single column name")
-    }
-  }
-  
-  # Determine if control_100perc are column positions or names
-  control_100_positions <- NULL
-  control_100_names <- NULL
-  using_positions <- FALSE
-  
-  if (!is.null(control_100perc)) {
-    if (is.numeric(control_100perc)) {
-      control_100_positions <- control_100perc
-      using_positions <- TRUE
-      if (verbose) {
-        message("Using column positions ", paste(control_100_positions, collapse = ", "), 
-                " for 100% control")
-      }
-    } else if (is.character(control_100perc)) {
-      control_100_names <- control_100perc
-      if (verbose && length(control_100_names) > 1) {
-        message("Using column names for 100% control: ", 
-                paste(control_100_names, collapse = ", "))
-      }
-    } else {
-      stop("control_100perc must be either numeric positions or character column names")
-    }
-  }
-  
+
   # --- INFO TABLE PROCESSING ---
   # Process metadata for biological replicates and construct identification
   if (!is.null(info_table)) {
     if (ncol(info_table) < 4) {
       stop("Info table must have at least 4 columns: log(inhibitor), Plate_Row, Construct, and Compound")
     }
-    
+
     base_id_values <- paste(info_table[[3]], info_table[[4]], sep = ":")
     info_table$Base_ID <- base_id_values
-    
+
     id_counts <- table(base_id_values)
     duplicate_ids <- names(id_counts)[id_counts > 1]
-    
+
     # Distinguish biological replicates by adding suffixes
     if (length(duplicate_ids) > 0) {
       suffix_counter <- setNames(rep(1, length(duplicate_ids)), duplicate_ids)
       new_construct_values <- info_table[[3]]
-      
+
       for (i in seq_along(base_id_values)) {
         current_base_id <- base_id_values[i]
         if (current_base_id %in% duplicate_ids) {
@@ -325,9 +431,9 @@ ratio_dose_response_v2 <- function(data,
           suffix_counter[current_base_id] <- suffix_counter[current_base_id] + 1
         }
       }
-      
+
       info_table$Construct_Modified <- new_construct_values
-      
+
       if (verbose) {
         message("Found and automatically distinguished ", length(duplicate_ids),
                 " biological replicate(s): ", paste(duplicate_ids, collapse = ", "))
@@ -335,52 +441,43 @@ ratio_dose_response_v2 <- function(data,
     } else {
       info_table$Construct_Modified <- info_table[[3]]
     }
-    
+
     info_table$ID <- paste(info_table$Construct_Modified, info_table[[4]], sep = ":")
   }
-  
+
   # --- QUALITY CONTROL CALCULATIONS ---
   # Calculate assay quality metrics if metadata and controls are provided
   if (!is.null(info_table) && !is.null(control_0perc) && !is.null(control_100perc)) {
-    
+
     plate_row_values <- info_table[[2]]
     construct_values <- info_table$Construct_Modified
-    
+
     plate_row_to_index <- setNames(seq_along(plate_row_values), plate_row_values)
-    
+
     construct_groups <- list()
     unique_constructs <- unique(construct_values)
-    
+
     for (construct in unique_constructs) {
       construct_indices <- which(construct_values == construct)
       construct_groups[[construct]] <- plate_row_values[construct_indices]
     }
-    
+
     row_intervals <- lapply(construct_groups, function(plate_rows) {
       indices <- plate_row_to_index[plate_rows]
       as.numeric(indices[!is.na(indices)])
     })
-    
+
     row_intervals <- row_intervals[sapply(row_intervals, length) > 0]
-    
-    # Convert positions to column names if using positions
-    if (using_positions) {
-      all_colnames <- colnames(ratio_modified)
-      valid_positions <- control_100_positions[control_100_positions >= 1 & 
-                                                 control_100_positions <= length(all_colnames)]
-      control_100_colnames <- all_colnames[valid_positions]
-    } else {
-      control_100_colnames <- control_100_names
-    }
-    
-    existing_100_cols <- control_100_colnames[control_100_colnames %in% colnames(ratio)]
-    
+
+    # Get 100% control column names
+    existing_100_cols <- control_100_names[control_100_names %in% colnames(ratio)]
+
     if (length(existing_100_cols) > 0 && length(row_intervals) > 0) {
-      
+
       # General means calculation for 100% controls
       if (length(existing_100_cols) > 0) {
         general_mean_100 <- mean(as.matrix(ratio[, existing_100_cols, drop = FALSE]), na.rm = TRUE)
-        
+
         result$general_means <- data.frame(
           Type = "General",
           Control_Type = "100%_Control",
@@ -389,11 +486,11 @@ ratio_dose_response_v2 <- function(data,
           stringsAsFactors = FALSE
         )
       }
-      
+
       # Helper function to determine overall quality from multiple metrics
       get_lowest_comment <- function(luciferase_comment, assay_window_comment, z_score_comment) {
         priority_order <- c("insufficient", "low", "medium", "high")
-        
+
         extract_level <- function(comment) {
           if (is.null(comment) || is.na(comment) || comment == "") {
             return("insufficient")
@@ -405,42 +502,42 @@ ratio_dose_response_v2 <- function(data,
             return("insufficient")
           }
         }
-        
+
         luciferase_level <- extract_level(luciferase_comment)
         assay_level <- extract_level(assay_window_comment)
         z_level <- extract_level(z_score_comment)
-        
+
         luciferase_score <- match(luciferase_level, priority_order)
         assay_score <- match(assay_level, priority_order)
         z_score <- match(z_level, priority_order)
-        
+
         scores_to_consider <- c(luciferase_score, assay_score)
         if (!is.na(z_score) && z_level != "insufficient") {
           scores_to_consider <- c(scores_to_consider, z_score)
         }
-        
+
         if (all(is.na(scores_to_consider))) {
           return("insufficient")
         }
-        
+
         min_score <- min(scores_to_consider, na.rm = TRUE)
         return(priority_order[min_score])
       }
-      
+
       # Calculate quality metrics for each construct
       calculate_construct_means <- function() {
         interval_means_list <- list()
-        
+
         for (construct_name in unique_constructs) {
           if (construct_name %in% names(row_intervals)) {
             interval_rows <- row_intervals[[construct_name]]
             valid_rows <- interval_rows[interval_rows >= 1 & interval_rows <= nrow(ratio)]
-            
+
             if (length(valid_rows) > 0) {
               # Luciferase signal analysis
               subtable1_interval_data <- as.matrix(subtable1_num[valid_rows, ])
               mean_subtable1_all <- mean(subtable1_interval_data, na.rm = TRUE)
-              
+
               luciferase_comment <- if (is.na(mean_subtable1_all)) {
                 "insufficient luciferase signal"
               } else if (mean_subtable1_all > 100000) {
@@ -452,7 +549,7 @@ ratio_dose_response_v2 <- function(data,
               } else {
                 "insufficient luciferase signal"
               }
-              
+
               # Initialize variables
               z_score <- NA
               assay_window <- NA
@@ -462,32 +559,32 @@ ratio_dose_response_v2 <- function(data,
               mean_positive <- NA
               sd_background <- NA
               sd_positive <- NA
-              
+
               # Calculate metrics if we have fixed 0% value and 100% controls
               if (control_0_is_value && length(existing_100_cols) > 0) {
                 mean_background <- control_0_value
-                
+
                 # Calculate mean and SD of 100% controls for this construct
                 control_100_data <- ratio[valid_rows, existing_100_cols, drop = FALSE]
                 mean_positive <- mean(as.matrix(control_100_data), na.rm = TRUE)
                 sd_positive <- sd(as.matrix(control_100_data), na.rm = TRUE)
-                
+
                 # Z-score and assay window calculations
                 if (!is.na(mean_positive) && !is.na(mean_background)) {
                   sd_background <- 0  # Fixed value has no variability
-                  
+
                   z_score <- if ((mean_positive - mean_background) != 0) {
                     1 - (3 * (sd_positive + sd_background) / (mean_positive - mean_background))
                   } else {
                     NA
                   }
-                  
+
                   assay_window <- if (mean_background != 0) {
                     mean_positive / mean_background
                   } else {
                     NA
                   }
-                  
+
                   # Quality comments based on calculated values
                   assay_window_comment <- if (is.na(assay_window)) {
                     "insufficient"
@@ -500,7 +597,7 @@ ratio_dose_response_v2 <- function(data,
                   } else {
                     "insufficient"
                   }
-                  
+
                   z_score_comment <- if (is.na(z_score)) {
                     "insufficient"
                   } else if (z_score > 0.7) {
@@ -517,9 +614,9 @@ ratio_dose_response_v2 <- function(data,
                   z_score_comment <- "insufficient"
                 }
               }
-              
+
               lowest_comment <- get_lowest_comment(luciferase_comment, assay_window_comment, z_score_comment)
-              
+
               interval_means_list[[construct_name]] <- data.frame(
                 Type = "Construct_Interval",
                 Construct = construct_name,
@@ -545,13 +642,13 @@ ratio_dose_response_v2 <- function(data,
         }
         return(interval_means_list)
       }
-      
+
       interval_means_list <- calculate_construct_means()
-      
+
       if (length(interval_means_list) > 0) {
         result$interval_means <- do.call(rbind, interval_means_list)
         rownames(result$interval_means) <- NULL
-        
+
         # Reorder columns for better presentation
         result$interval_means <- result$interval_means[, c(
           "Type", "Construct",
@@ -562,7 +659,7 @@ ratio_dose_response_v2 <- function(data,
           "Assay_z_Comment", "Overall_Quality",
           "Rows", "Rows_Count", "Background_Type", "Background_Value"
         )]
-        
+
         # Transpose for better Excel presentation
         if (nrow(result$interval_means) > 0) {
           interval_means_clean <- result$interval_means[, -c(1, 2)]
@@ -570,85 +667,76 @@ ratio_dose_response_v2 <- function(data,
           interval_means_transposed <- as.data.frame(t(interval_means_clean))
           result$interval_means <- interval_means_transposed
         }
-        
+
         result$construct_intervals <- row_intervals
       }
     }
   }
-  
+
   # --- NEW CONTROL COLUMN IMPLEMENTATION ---
-  # Convert positions to column names if needed
-  if (using_positions) {
-    all_colnames <- colnames(ratio_modified)
-    valid_positions <- control_100_positions[control_100_positions >= 1 & 
-                                               control_100_positions <= length(all_colnames)]
-    control_100_colnames <- all_colnames[valid_positions]
-  } else {
-    control_100_colnames <- control_100_names
-  }
-  
-  existing_100_cols <- control_100_colnames[control_100_colnames %in% colnames(ratio_modified)]
-  
+  existing_100_cols <- control_100_names[control_100_names %in% colnames(ratio_modified)]
+
   # When using fixed 0% value and multiple 100% control columns
   if (control_0_is_value && length(existing_100_cols) > 0) {
-    
+
     # Calculate row-wise mean of 100% control columns
     if (length(existing_100_cols) == 1) {
       mean_100perc <- ratio_modified[, existing_100_cols]
     } else {
       mean_100perc <- rowMeans(ratio_modified[, existing_100_cols, drop = FALSE], na.rm = TRUE)
     }
-    
+
     # 1. Create new column for fixed 0% control value
     ratio_modified$Fixed_0perc <- control_0_value
-    
+
     # 2. Create new column for 100% control (mean of specified columns)
     ratio_modified$Mean_100perc <- mean_100perc
-    
+
     # 3. Remove original 100% control columns
     ratio_modified <- ratio_modified[, !colnames(ratio_modified) %in% existing_100_cols]
-    
+
     # 4. Reorder columns: Fixed_0perc first, experimental columns middle, Mean_100perc last
     all_cols <- colnames(ratio_modified)
     control_cols <- c("Fixed_0perc", "Mean_100perc")
     other_cols <- setdiff(all_cols, control_cols)
-    
+
     ratio_modified <- ratio_modified[, c("Fixed_0perc", other_cols, "Mean_100perc")]
-    
+
     if (verbose) {
-      message("Created new control structure with fixed 0% = ", control_0_value, 
+      message("Created new control structure with fixed 0% = ", control_0_value,
               " and mean 100% from ", length(existing_100_cols), " column(s)")
     }
-    
-  } else if (!control_0_is_value && length(existing_100_cols) == 1) {
-    control_cols <- c(control_0perc, existing_100_cols)
+
+  } else if (!control_0_is_value && !is.null(control_0_info) && length(existing_100_cols) == 1) {
+    # Traditional case: two specific control columns
+    control_cols <- c(control_0_info$column_name, existing_100_cols)
     missing_controls <- control_cols[!control_cols %in% colnames(ratio_modified)]
     if (length(missing_controls) > 0) {
       stop("Control columns not found: ", paste(missing_controls, collapse = ", "))
     }
-    
+
     other_columns <- setdiff(colnames(ratio_modified), control_cols)
-    ratio_modified <- ratio_modified[, c(control_0perc, other_columns, existing_100_cols)]
+    ratio_modified <- ratio_modified[, c(control_0_info$column_name, other_columns, existing_100_cols)]
   }
-  
+
   # --- TABLE TRANSPOSITION ---
   # Transpose so constructs become columns and concentrations become rows
   ratio_modified_transposed <- as.data.frame(t(ratio_modified))
   colnames(ratio_modified_transposed) <- rownames(ratio_modified)
-  
+
   # --- COLUMN RENAMING WITH INFO_TABLE ---
   # Replace column names with IDs from info_table
   if (!is.null(info_table)) {
     mapping <- setNames(info_table$ID, info_table[[2]])
     new_colnames <- mapping[colnames(ratio_modified_transposed)]
-    
+
     colnames(ratio_modified_transposed) <- ifelse(
       is.na(new_colnames),
       colnames(ratio_modified_transposed),
       new_colnames
     )
   }
-  
+
   # --- TECHNICAL REPLICATE SPLITTING ---
   # Split experimental concentrations into two technical replicates
   final_table <- if (split_replicates) {
@@ -658,28 +746,28 @@ ratio_dose_response_v2 <- function(data,
         warning("Not enough rows to split replicates. Returning original table.")
         return(df)
       }
-      
+
       # First and last rows are controls
       control_rows <- c(1, n_rows)
       exp_rows <- 2:(n_rows - 1)  # Middle rows are experimental concentrations
       split_pt <- floor(length(exp_rows) / 2)
-      
+
       rep1_rows <- exp_rows[1:split_pt]
       rep2_rows <- exp_rows[(split_pt + 1):length(exp_rows)]
-      
+
       # Ensure both replicates have same number of rows
       if (length(rep1_rows) != length(rep2_rows)) {
         min_len <- min(length(rep1_rows), length(rep2_rows))
         rep1_rows <- rep1_rows[1:min_len]
         rep2_rows <- rep2_rows[1:min_len]
       }
-      
+
       new_table <- data.frame()
-      
+
       for (col in colnames(df)) {
         rep1 <- df[c(control_rows[1], rep1_rows, control_rows[2]), col]
         rep2 <- df[c(control_rows[1], rep2_rows, control_rows[2]), col]
-        
+
         if (ncol(new_table) == 0) {
           new_table <- data.frame(rep1, rep2)
           colnames(new_table) <- c(col, paste0(col, ".2"))
@@ -688,13 +776,13 @@ ratio_dose_response_v2 <- function(data,
           new_table[[paste0(col, ".2")]] <- rep2
         }
       }
-      
+
       new_rownames <- c(
         rownames(df)[control_rows[1]],  # 0% control
         rownames(df)[rep1_rows],        # First technical replicate
         rownames(df)[control_rows[2]]   # 100% control
       )
-      
+
       rownames(new_table) <- new_rownames
       return(new_table)
     }
@@ -702,19 +790,19 @@ ratio_dose_response_v2 <- function(data,
   } else {
     ratio_modified_transposed
   }
-  
+
   # --- ADD LOG(INHIBITOR) COLUMN ---
   # Add log(inhibitor) concentration as first column
   if (!is.null(info_table)) {
     log_col <- info_table[[1]]
     n_needed <- nrow(final_table)
-    
+
     if (length(log_col) > 0) {
       if (!is.na(log_col[1])) {
         warning("First row of log(inhibitor) is not NA. Shifting values and setting first row to NA.")
-        
+
         adjusted_log_col <- c(NA, log_col[1:min(length(log_col), n_needed - 1)])
-        
+
         if (length(adjusted_log_col) < n_needed) {
           adjusted_log_col <- c(adjusted_log_col, rep(NA, n_needed - length(adjusted_log_col)))
         }
@@ -725,64 +813,79 @@ ratio_dose_response_v2 <- function(data,
           c(log_col, rep(NA, n_needed - length(log_col)))
         }
       }
-      
+
       final_table <- cbind(adjusted_log_col, final_table)
       colnames(final_table)[1] <- colnames(info_table)[1]
     }
   }
-  
+
   # --- EXCEL EXPORT ---
   if (!is.null(save_to_excel)) {
     if (!requireNamespace("openxlsx", quietly = TRUE)) {
       stop("Package 'openxlsx' is required to save Excel files. Please install it.")
     }
-    
+
     tryCatch({
       wb <- openxlsx::createWorkbook()
-      
+
       openxlsx::addWorksheet(wb, "Modified_Ratio_Table")
       openxlsx::writeData(wb, "Modified_Ratio_Table",
                           cbind(RowNames = rownames(final_table), final_table),
                           rowNames = FALSE)
-      
+
       if (!is.null(result$original_ratio_table)) {
         openxlsx::addWorksheet(wb, "Original_Ratio_Table")
         original_with_rownames <- cbind(RowNames = rownames(result$original_ratio_table),
                                         result$original_ratio_table)
         openxlsx::writeData(wb, "Original_Ratio_Table", original_with_rownames, rowNames = FALSE)
       }
-      
+
       if (!is.null(result$general_means)) {
         openxlsx::addWorksheet(wb, "General_Means")
         openxlsx::writeData(wb, "General_Means", result$general_means)
       }
-      
+
       if (!is.null(result$interval_means)) {
         openxlsx::addWorksheet(wb, "Interval_Means")
         openxlsx::writeData(wb, "Interval_Means", result$interval_means)
       }
-      
+
       openxlsx::saveWorkbook(wb, save_to_excel, overwrite = TRUE)
       if (verbose) message("Excel file saved successfully: ", save_to_excel)
-      
+
     }, error = function(e) {
       warning("Failed to save Excel file: ", e$message)
     })
   }
-  
+
   # --- FINAL RESULT ASSEMBLY ---
   result$original_ratio_table <- ratio
   result$modified_ratio_table <- final_table
-  
+
   # Control information for user reference
   result$control_info <- list(
     control_0_type = ifelse(control_0_is_value, "Fixed_Value", "Column"),
     control_0_value = if (control_0_is_value) control_0_value else control_0perc,
-    control_100_input = if (using_positions) control_100_positions else control_100_names,
+    control_100_input = control_100perc,
     control_100_actual_columns = existing_100_cols,
-    new_columns_created = if (control_0_is_value && length(existing_100_cols) > 0) 
+    new_columns_created = if (control_0_is_value && length(existing_100_cols) > 0)
       c("Fixed_0perc", "Mean_100perc") else NULL
   )
-  
+
+  # Add information about selected columns
+  result$selected_columns_info <- if (!is.null(selected_columns)) {
+    list(
+      user_indices = selected_columns,
+      actual_indices = selected_columns + 1,
+      description = paste("Data columns", paste(selected_columns, collapse = ", "))
+    )
+  } else {
+    list(
+      user_indices = 1:24,
+      actual_indices = 2:25,
+      description = "All data columns (1:24)"
+    )
+  }
+
   return(result)
 }

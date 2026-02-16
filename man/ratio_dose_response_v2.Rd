@@ -12,7 +12,8 @@ ratio_dose_response_v2(
   info_table = NULL,
   save_to_excel = NULL,
   verbose = TRUE,
-  low_value_threshold = 3000
+  low_value_threshold = 3000,
+  selected_columns = NULL
 )
 }
 \arguments{
@@ -157,7 +158,7 @@ The modified_ratio_table has the following structure:
 \preformatted{
   Column 1:    log(inhibitor) concentration values (first row = NA)
   Columns 2-n: Experimental constructs (with .2 suffix for second technical replicate)
-  
+
   Row structure:
   - Row 1:      0% control values (Fixed_0perc if using fixed-value mode)
   - Rows 2-(n-1): Experimental concentration measurements

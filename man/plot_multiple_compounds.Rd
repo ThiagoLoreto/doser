@@ -7,29 +7,34 @@
 plot_multiple_compounds(
   results,
   compound_indices = NULL,
+  target_compound = NULL,
+  position = NULL,
   y_limits = c(0, 150),
+  colors = NULL,
+  color_palette = NULL,
   point_shapes = NULL,
-  colors = FALSE,
+  show_error_bars = TRUE,
   legend_position = "right",
-  show_grid = FALSE,
   show_legend = TRUE,
+  shape_by_compound = FALSE,
+  show_grid = FALSE,
   save_plot = NULL,
   plot_width = 10,
   plot_height = 8,
   plot_dpi = 600,
-  axis_label_size = 14,
-  axis_text_size = 14,
-  show_error_bars = TRUE,
-  error_bar_width = 0.05,
   plot_title = NULL,
+  legend_title = "",
   legend_text_size = NULL,
   legend_title_size = 11,
-  legend_key_height = NULL,
-  legend_ncol = NULL,
+  y_axis_title = NULL,
+  verbose = TRUE,
+  axis_text_color = "black",
+  axis_text_size = 12,
+  axis_title_color = "black",
+  axis_title_size = 14,
+  error_bar_width = 0.05,
   legend_label_wrap = 25,
-  plot_ratio = 0.7,
-  legend_title = NULL,
-  legend_labels = NULL
+  legend_ncol = NULL
 )
 }
 \arguments{
@@ -43,8 +48,6 @@ are included.}
 
 \item{y_limits}{Numeric vector of length 2 specifying the y-axis limits}
 
-\item{point_shapes}{Numeric vector of point shapes for different compounds}
-
 \item{colors}{Character vector of colors for different compound curves
 \itemize{
 \item \code{FALSE} (default): all curves and points are black;
@@ -52,12 +55,16 @@ are included.}
 \item Character vector of custom colors (recycled if shorter than the number of compounds).
 }}
 
+\item{point_shapes}{Numeric vector of point shapes for different compounds}
+
+\item{show_error_bars}{Logical indicating whether to display error bars around data points}
+
 \item{legend_position}{Position of the legend: one of \code{"right"}, \code{"left"},
 \code{"top"}, \code{"bottom"}, or \code{"none"}. Default: \code{"right"}.}
 
-\item{show_grid}{Logical indicating whether to show background grid lines}
-
 \item{show_legend}{Logical indicating whether to display the legend}
+
+\item{show_grid}{Logical indicating whether to show background grid lines}
 
 \item{save_plot}{Defines whether to save the plot: \code{NULL} (do not save, default),
 \code{TRUE} (automatically saves as PNG with default name), or a file path with extension
@@ -67,31 +74,29 @@ are included.}
 
 \item{plot_dpi}{Resolution (in DPI) for saved plots. Default: \code{600}.}
 
-\item{axis_label_size}{Numeric value for axis title font size}
-
-\item{axis_text_size}{Numeric value for axis tick label font size}
-
-\item{show_error_bars}{Logical indicating whether to display error bars around data points}
-
-\item{error_bar_width}{Numeric value controlling the width of error bars}
-
 \item{plot_title}{Custom plot title. If \code{NULL}, a smart title is generated
 automatically based on the compound names.}
+
+\item{legend_title}{Title for the legend (displayed above symbols).}
 
 \item{legend_text_size}{Numeric value for legend text font size}
 
 \item{legend_title_size}{Numeric value for legend title font size}
 
-\item{legend_key_height}{Height (in points) of legend keys. Automatically adjusted.}
+\item{axis_text_size}{Numeric value for axis tick label font size}
 
-\item{legend_ncol}{Numeric value specifying number of columns in legend}
+\item{error_bar_width}{Numeric value controlling the width of error bars}
 
 \item{legend_label_wrap}{Maximum character width before legend labels
 automatically wrap to new lines. Default: \code{25}.}
 
-\item{plot_ratio}{Numeric value for plot aspect ratio (width/height)}
+\item{legend_ncol}{Numeric value specifying number of columns in legend}
 
-\item{legend_title}{Title for the legend (displayed above symbols).}
+\item{axis_label_size}{Numeric value for axis title font size}
+
+\item{legend_key_height}{Height (in points) of legend keys. Automatically adjusted.}
+
+\item{plot_ratio}{Numeric value for plot aspect ratio (width/height)}
 
 \item{legend_labels}{Character vector of custom labels for legend (overrides target/compound names)}
 }

@@ -12,7 +12,8 @@ ratio_dose_response(
   info_table = NULL,
   save_to_excel = NULL,
   verbose = TRUE,
-  low_value_threshold = 1000
+  low_value_threshold = 1000,
+  selected_columns = NULL
 )
 }
 \arguments{
