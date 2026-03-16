@@ -103,7 +103,6 @@
 
 
 
-
 batch_drc_analysis <- function(batch_results,
                                normalize = FALSE,
                                enforce_bottom_threshold = FALSE,
@@ -270,7 +269,7 @@ batch_drc_analysis <- function(batch_results,
           }
 
           # --- NORMALIZED SPAN CALCULATION ---
-          norm_span <- NA_real_
+          span_ratio <- NA_real_
 
           if (!is.null(full_data_df) && nrow(full_data_df) >= 2) {
 
@@ -295,12 +294,11 @@ batch_drc_analysis <- function(batch_results,
               fit_span <- NA_real_
               if (length(res$parameters$Value) >= 5) fit_span <- res$parameters$Value[5]
 
-              # 4. Calculation: 1 - (Span / (Mean_Last - Mean_First))
+              # 4. Calculation: abs(fit_span) / abs(mean_end_row - mean_start_row)
               diff_window <- abs(mean_end_row - mean_start_row)
 
               if (!is.na(diff_window) && diff_window > 1e-6 && !is.na(fit_span)) {
-                # Formula: 1 - (Abs(Span) / Abs(Observed_Window))
-                norm_span <- 1 - (abs(fit_span) / diff_window)
+                span_ratio <- abs(fit_span) / diff_window
               }
             }
           }
@@ -313,8 +311,25 @@ batch_drc_analysis <- function(batch_results,
           if (is.na(pic50_diff_lower) || is.na(pic50_diff_upper)) {
             flag_collector <- c(flag_collector, "Undefined CI")
           } else {
-            if (pic50_diff_lower > 0.4642) flag_collector <- c(flag_collector, "Unstable pIC50 (Lower CI > 0.4642)")
-            if (pic50_diff_upper > 0.4642) flag_collector <- c(flag_collector, "Unstable pIC50 (Upper CI > 0.4642)")
+            # 3-fold = log10(3) = 0.47712
+            # 5-fold = log10(5) = 0.69897
+            ci_flags <- character()
+
+            if (pic50_diff_lower > 0.69897) {
+              ci_flags <- c(ci_flags, sprintf("Lower CI >5-fold (%.3f)", pic50_diff_lower))
+            } else if (pic50_diff_lower > 0.47712) {
+              ci_flags <- c(ci_flags, sprintf("Lower CI >3-fold (%.3f)", pic50_diff_lower))
+            }
+
+            if (pic50_diff_upper > 0.69897) {
+              ci_flags <- c(ci_flags, sprintf("Upper CI >5-fold (%.3f)", pic50_diff_upper))
+            } else if (pic50_diff_upper > 0.47712) {
+              ci_flags <- c(ci_flags, sprintf("Upper CI >3-fold (%.3f)", pic50_diff_upper))
+            }
+
+            if (length(ci_flags) > 0) {
+              flag_collector <- c(flag_collector, paste(ci_flags, collapse = "; "))
+            }
           }
 
           if (!is.na(ideal_hill)) {
@@ -326,8 +341,12 @@ batch_drc_analysis <- function(batch_results,
             }
           }
 
-          if (!is.na(norm_span) && norm_span >= 0.5) {
-            flag_collector <- c(flag_collector, "Normalized Span >= 0.5")
+          if (!is.na(span_ratio)) {
+            if (span_ratio < 0.5) {
+              flag_collector <- c(flag_collector, sprintf("Norm Span < 0.5 (%.2f)", span_ratio))
+            } else if (span_ratio > 1.5) {
+              flag_collector <- c(flag_collector, sprintf("Norm Span > 1.5 (%.2f)", span_ratio))
+            }
           }
 
           final_flags <- if (length(flag_collector) > 0) paste(flag_collector, collapse = "; ") else "OK"
@@ -340,7 +359,7 @@ batch_drc_analysis <- function(batch_results,
             CI_95_Upper = round(pic50_diff_upper, 3),
             CI_95_Lower = round(pic50_diff_lower, 3),
             Ideal_Hill_Slope = round(ideal_hill, 3),
-            Normalized_Span = round(norm_span, 3),
+            Normalized_Span = round(span_ratio, 3),
             Flags = final_flags,
             stringsAsFactors = FALSE
           )
