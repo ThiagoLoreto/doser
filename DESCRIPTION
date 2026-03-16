@@ -26,7 +26,14 @@ Imports:
     grDevices,
     graphics,
     utils,
-    dplyr
+    dplyr,
+    openxlsx,
+    RColorBrewer,
+    scales,
+    tidyr,
+    tibble,
+    ggsci,
+    viridisLite
 Suggests: 
     stringr,
     lmtest,
