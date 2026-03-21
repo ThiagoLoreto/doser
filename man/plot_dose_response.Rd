@@ -11,20 +11,21 @@ plot_dose_response(
   point_color = "black",
   line_color = "black",
   ic50_line_color = "gray",
-  point_size = 1,
+  point_size = 2,
   line_width = 2,
   error_bar_width = 0.01,
   show_ic50_line = TRUE,
-  show_legend = TRUE,
+  show_legend = FALSE,
   show_grid = FALSE,
   save_plot = NULL,
   plot_width = 10,
-  plot_height = 8,
+  plot_height = 10,
   plot_dpi = 600,
-  axis_label_size = 14,
-  axis_text_size = 14,
+  axis_label_size = 20,
+  axis_text_size = 18,
   x_axis_title = NULL,
   y_axis_title = NULL,
+  plot_title = TRUE,
   enforce_bottom_threshold = NULL,
   bottom_threshold = 60,
   verbose = FALSE
@@ -44,13 +45,13 @@ dose-response analysis results.}
 
 \item{ic50_line_color}{Color for IC50 vertical line (default: "gray").}
 
-\item{point_size}{Size multiplier for data points (default: 1).}
+\item{point_size}{Size multiplier for data points (default: 2).}
 
 \item{line_width}{Line width for fitted curve (default: 2).}
 
 \item{error_bar_width}{Width of error bar ends (default: 0.01).}
 
-\item{show_ic50_line}{Logical indicating whether to show vertical IC50 line (default: TRUE).}
+\item{show_ic50_line}{Logical indicating whether to show vertical IC50 line (default: FALSE).}
 
 \item{show_legend}{Logical indicating whether to show parameter legend (default: FALSE).}
 
@@ -62,17 +63,21 @@ dose-response analysis results.}
 
 \item{plot_width}{Plot width in inches for saved plots (default: 10).}
 
-\item{plot_height}{Plot height in inches for saved plots (default: 8).}
+\item{plot_height}{Plot height in inches for saved plots (default: 10).}
 
 \item{plot_dpi}{Resolution for saved raster images (default: 600).}
 
-\item{axis_label_size}{Font size for axis labels (default: 14).}
+\item{axis_label_size}{Font size for axis labels (default: 20).}
 
-\item{axis_text_size}{Font size for axis numbers (default: 14).}
+\item{axis_text_size}{Font size for axis numbers (default: 18).}
 
 \item{x_axis_title}{Custom x-axis title. If NULL, uses default expression.}
 
 \item{y_axis_title}{Custom y-axis title. If NULL, uses default based on normalization.}
+
+\item{plot_title}{Controls the plot title. \code{FALSE} (default) = no title;
+\code{TRUE} = automatic title (construct + compound name);
+character = custom title text.}
 
 \item{enforce_bottom_threshold}{Logical indicating whether bottom threshold enforcement
 was used in analysis (default: NULL, auto-detected from results).}

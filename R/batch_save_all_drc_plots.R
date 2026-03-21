@@ -1,310 +1,471 @@
-#' Save All Dose-Response Curves from Batch Analysis Results
+#' Save all dose-response curves from batch analysis
 #'
 #' @description
-#' This function automatically generates and saves Dose-Response Curve (DRC) plots for all
-#' successful fits found in batch analysis results. It creates a systematic file structure
-#' and handles naming, organization, and error management.
+#' Generates and saves dose-response curves for all compounds in a batch analysis
+#' result object. Plots are saved in the specified format and can be organized
+#' by plate, by compound, or in a flat structure.
 #'
-#' @param batch_drc_results A named list containing the results of the DRC batch analysis.
-#'   Structure expected: \code{list(plate_name = list(drc_result = list(detailed_results = ...)))}.
-#'   Can also accept a wrapper object from \code{batch_drc_analysis()} which contains a \code{drc_results} element.
-#' @param output_dir Character. Directory where plots will be saved (default: "DRC_Plots").
-#'   Created if it doesn't exist.
-#' @param create_subfolders Logical. If \code{TRUE} (default), creates separate subfolders for each plate.
-#'   If \code{FALSE}, all plots are saved directly in \code{output_dir}.
-#' @param file_prefix Character. Prefix for all saved files (default: "DRC").
-#' @param file_extension Character. File format extension (default: "png").
-#'   Other options: "pdf", "jpg", "tiff", "svg".
-#' @param overwrite Logical. If \code{TRUE}, overwrites existing files. If \code{FALSE} (default),
-#'   skips files that already exist.
-#' @param plates_to_process Character vector. Specific plate names to process.
-#'   If \code{NULL} (default), processes all plates.
-#' @param compounds_to_exclude Character vector. Compound names to exclude from plotting.
-#'   Useful for removing controls or failed compounds.
-#' @param verbose Logical. If \code{TRUE} (default), prints progress messages to the console.
-#' @param show_legend Logical. If \code{TRUE}, displays legend in plots. If \code{FALSE} (default),
-#'   omits legend for cleaner individual plots.
-#' @param ... Additional arguments passed to \code{\link{plot_drc_batch}}.
-#'   Common options: \code{y_limits}, \code{colors}, \code{plot_width}, \code{plot_height}, etc.
+#' @param batch_drc_results Output from \code{\link{batch_drc_analysis}}. Can be either
+#'   the complete wrapper object or the extracted \code{drc_results} component.
+#' @param output_dir Character string specifying the main output directory where
+#'   plots will be saved. Default is "DRC_Plots".
+#' @param organize_by Character string specifying how to organize the output files.
+#'   Options are:
+#'   \itemize{
+#'     \item{"plate" (default):}{ Create subfolders for each plate.}
+#'     \item{"compound":}{ Create subfolders for each compound.}
+#'     \item{"flat":}{ Save all plots in the same directory.}
+#'   }
+#' @param compounds_to_plot Optional character vector of compound names to plot.
+#'   If NULL (default), all compounds are plotted.
+#' @param plates_to_plot Optional character vector of plate names to plot.
+#'   If NULL (default), all plates are processed.
+#' @param format Character string specifying the output format for plots.
+#'   Options include "png", "pdf", "svg", "jpeg". Default is "png".
+#' @param width Numeric value specifying the plot width in inches. Default is 10.
+#' @param height Numeric value specifying the plot height in inches. Default is 10.
+#' @param dpi Numeric value specifying the resolution for raster formats (png, jpeg).
+#'   Default is 600.
+#' @param point_color Character string specifying the color of data points.
+#'   Default is "black".
+#' @param point_size Numeric value specifying the size of data points.
+#'   Default is 2.
+#' @param show_ic50_line Logical value indicating whether to show a vertical line
+#'   at the IC50 value. Default is FALSE.
+#' @param plot_title Controls the plot title. Can be:
+#'   \itemize{
+#'     \item{\code{FALSE} (default):}{ No title displayed.}
+#'     \item{\code{TRUE}:}{ Automatic title with compound name.
+#'       If the model failed to converge, adds "(Model failed)" to the title.}
+#'     \item{character:}{ Custom title text applied to all plots.}
+#'   }
+#' @param verbose Logical value indicating whether to display progress messages.
+#'   Default is TRUE.
+#' @param ... Additional arguments passed to \code{\link{plot_dose_response}}.
+#'   See that function's documentation for all available parameters
+#'   (e.g., \code{line_color}, \code{show_legend}, \code{y_limits},
+#'   \code{axis_label_size}, etc.).
 #'
 #' @return An invisible list containing:
 #'   \itemize{
-#'     \item \code{total}: Total number of plots attempted
-#'     \item \code{success}: Number of successfully saved plots
-#'     \item \code{failed}: Number of failed plots
-#'     \item \code{output_dir}: Path where plots were saved
+#'     \item{\code{total}:}{ Total number of compounds processed.}
+#'     \item{\code{successes}:}{ Number of successfully generated plots.}
+#'     \item{\code{failures}:}{ Number of failed plots.}
+#'     \item{\code{failed_compounds}:}{ Character vector of compounds that failed.}
+#'     \item{\code{error_messages}:}{ List of error messages for failed plots.}
+#'     \item{\code{output_dir}:}{ Path to the output directory.}
+#'     \item{\code{organization}:}{ Organization mode used.}
+#'     \item{\code{point_color}:}{ Color used for data points.}
+#'     \item{\code{timestamp}:}{ Timestamp of when the function was run.}
 #'   }
 #'
 #' @details
-#' This function scans through all batch DRC results, identifies successful fits,
-#' and generates individual plots for each construct-compound combination.
+#' This function scans all plates in the batch analysis result, identifies
+#' compounds with successful dose-response fits, and generates individual plots
+#' for each compound using \code{\link{plot_dose_response}}. The plots are saved
+#' with filenames based on compound names and organized according to the
+#' \code{organize_by} parameter.
 #'
-#' \strong{Filename Generation:} Files are named using the pattern:
-#' \code{[prefix]_[construct]_[compound].[extension]} (with plate subfolders if enabled).
-#' Special characters are replaced with underscores for compatibility.
-#'
-#' \strong{File Organization:}
+#' The function automatically handles different naming formats:
 #' \itemize{
-#'   \item With subfolders: \code{output_dir/plate_name/DRC_construct_compound.png}
-#'   \item Without subfolders: \code{output_dir/DRC_construct_compound_plate.png}
+#'   \item{"Construct | Compound" format}
+#'   \item{"Construct:Compound" format}
+#'   \item{Simple compound names}
 #' }
 #'
-#' \strong{Error Handling:} The function continues processing even if individual plots fail,
-#' recording failures in the return object and optionally printing warnings.
+#' File naming convention:
+#' \itemize{
+#'   \item{When \code{organize_by = "plate"}:}{ \code{compound_name.format} saved in plate subfolder}
+#'   \item{When \code{organize_by = "compound"}:}{ \code{plate_name_compound_name.format} saved in compound subfolder}
+#'   \item{When \code{organize_by = "flat"}:}{ \code{plate_name_compound_name.format} in main directory}
+#' }
+#'
+#' @note
+#' This function requires the \pkg{ggplot2} package. If a plot fails to generate,
+#' the error is captured and the function continues processing remaining compounds.
+#'
+#' @seealso
+#' \code{\link{plot_dose_response}} for the underlying plotting function and
+#' all available aesthetic parameters;
+#' \code{\link{batch_drc_analysis}} for generating the input data.
+#'
+#' @importFrom ggplot2 ggsave
+#' @importFrom utils txtProgressBar setTxtProgressBar
 #'
 #' @examples
 #' \dontrun{
-#' # 1. Save all plots with default settings
-#' batch_save_all_drc_plots(batch_drc_results)
-#'
-#' # 2. Save only specific plates as PDFs
+#' # Basic usage - saves all plots organized by plate
 #' batch_save_all_drc_plots(
-#'   batch_drc_results,
-#'   plates_to_process = c("Plate1", "Plate2"),
-#'   file_extension = "pdf",
-#'   overwrite = TRUE
+#'   batch_drc_results = my_results,
+#'   output_dir = "All_Plots"
 #' )
 #'
-#' # 3. Customize plot appearance and organization
+#' # Save only specific compounds, organized by compound name
 #' batch_save_all_drc_plots(
-#'   batch_drc_results,
-#'   output_dir = "Figures/DRC_Curves",
-#'   create_subfolders = FALSE,
-#'   file_prefix = "Curve",
-#'   y_limits = c(0, 150),
-#'   colors = "viridis",
-#'   plot_width = 10,
-#'   plot_height = 6,
-#'   plot_dpi = 300
+#'   batch_drc_results = my_results,
+#'   compounds_to_plot = c("MDCV001", "GZD824", "MLI-2"),
+#'   organize_by = "compound",
+#'   output_dir = "Selected_Compounds"
 #' )
 #'
-#' # 4. Exclude specific compounds and show legend
+#' # Customize plot appearance
 #' batch_save_all_drc_plots(
-#'   batch_drc_results,
-#'   compounds_to_exclude = c("DMSO", "Control"),
-#'   show_legend = TRUE,
-#'   verbose = FALSE
+#'   batch_drc_results = my_results,
+#'   output_dir = "Custom_Plots",
+#'   point_color = "blue",
+#'   point_size = 3,
+#'   show_ic50_line = TRUE,
+#'   plot_title = TRUE,  # Show automatic titles
+#'   y_limits = c(0, 100),  # Passed to plot_dose_response via ...
+#'   axis_label_size = 16,
+#'   axis_text_size = 14
+#' )
+#'
+#' # Save specific plates with custom title
+#' batch_save_all_drc_plots(
+#'   batch_drc_results = my_results,
+#'   plates_to_plot = c("plate_01", "plate_03"),
+#'   output_dir = "Selected_Plates",
+#'   plot_title = "Dose-Response Curve"
+#' )
+#'
+#' # Process only compounds from a specific construct
+#' batch_save_all_drc_plots(
+#'   batch_drc_results = my_results,
+#'   compounds_to_plot = c("MDCV001", "MDCV002", "MDCV003"),
+#'   output_dir = "LRRK2_Compounds"
 #' )
 #' }
 #'
-#' @seealso
-#' \code{\link{plot_drc_batch}} for individual plot generation
-#' \code{\link{batch_drc_analysis}} for generating batch DRC results
-#'
-#' @importFrom ggplot2 ggsave
-#' @importFrom dplyr bind_rows
 #' @export
+
 batch_save_all_drc_plots <- function(batch_drc_results,
                                      output_dir = "DRC_Plots",
-                                     create_subfolders = TRUE,
-                                     file_prefix = "DRC",
-                                     file_extension = "png",
-                                     overwrite = FALSE,
-                                     plates_to_process = NULL,
-                                     compounds_to_exclude = NULL,
+                                     organize_by = "plate",
+                                     compounds_to_plot = NULL,
+                                     plates_to_plot = NULL,
+                                     format = "png",
+                                     width = 10,
+                                     height = 10,
+                                     dpi = 600,
+                                     point_color = "black",
                                      verbose = TRUE,
-                                     show_legend = FALSE,
+                                     show_ic50_line = FALSE,
+                                     plot_title = FALSE,
+                                     point_size = 2,
                                      ...) {
 
   # ============================================================================
-  # 1. SETUP AND DATA EXTRACTION
+  # 1. VALIDATION AND SETUP
   # ============================================================================
-  if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("Package 'ggplot2' is required")
-  }
-  if (!requireNamespace("dplyr", quietly = TRUE)) {
-    stop("Package 'dplyr' is required")
-  }
 
-  # Extract drc_results if a wrapper object is provided
-  if (is.list(batch_drc_results) && "drc_results" %in% names(batch_drc_results)) {
-    if (verbose) message("Detected analysis wrapper object. Extracting 'drc_results'...")
-    batch_drc_results <- batch_drc_results$drc_results
+  # Check if required packages are installed
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("Package 'ggplot2' is required. Please install it.")
   }
 
   # Helper function for safe filename generation
-  make_safe_filename <- function(string) {
+  safe_filename <- function(string) {
     if (is.null(string) || is.na(string)) return("unknown")
-    s <- gsub("[^[:alnum:]]+", "_", string)
+    # Remove any characters that could cause filesystem issues
+    s <- gsub("[^[:alnum:]._-]", "_", string)
+    s <- gsub("_+", "_", s)
     s <- gsub("^_|_$", "", s)
+    if (nchar(s) == 0) return("unknown")
     return(s)
   }
 
-  # Helper to extract detailed results from plate objects
-  get_detailed_results <- function(plate_obj) {
-    if (is.null(plate_obj$drc_result)) return(NULL)
-    # Try different possible locations for results
-    res <- plate_obj$drc_result$detailed_results
-    if (is.null(res)) res <- plate_obj$drc_result$curve_results
-    if (is.null(res)) res <- plate_obj$drc_result$fits
-    if (is.list(res) && length(res) > 0) return(res)
-    return(NULL)
+  # Helper function to extract compound name properly
+  extract_compound_name <- function(compound_string) {
+    if (is.null(compound_string)) return("Unknown")
+
+    # Remove replicate suffix if present (.1, .2, etc.)
+    name <- gsub("\\.\\d+$", "", compound_string)
+
+    # Handle "Construct | Compound" format
+    if (grepl(" \\| ", name)) {
+      parts <- strsplit(name, " \\| ")[[1]]
+      return(trimws(parts[2]))
+    }
+
+    # Handle "Construct:Compound" format
+    if (grepl(":", name)) {
+      parts <- strsplit(name, ":")[[1]]
+      return(trimws(parts[2]))
+    }
+
+    return(name)
   }
 
-  # ============================================================================
-  # 2. EXTRACT VALID CONSTRUCT-COMPOUND COMBINATIONS
-  # ============================================================================
-  extract_combinations <- function(batch_results) {
-    combos_list <- list()
-    all_plates <- names(batch_results)
+  # Helper function to extract construct name
+  extract_construct_name <- function(compound_string) {
+    if (is.null(compound_string)) return("Unknown")
 
-    # Filter plates if specified
-    target_plates <- if (!is.null(plates_to_process)) {
-      intersect(all_plates, plates_to_process)
+    # Remove replicate suffix if present (.1, .2, etc.)
+    name <- gsub("\\.\\d+$", "", compound_string)
+
+    # Handle "Construct | Compound" format
+    if (grepl(" \\| ", name)) {
+      parts <- strsplit(name, " \\| ")[[1]]
+      return(trimws(parts[1]))
+    }
+
+    # Handle "Construct:Compound" format
+    if (grepl(":", name)) {
+      parts <- strsplit(name, ":")[[1]]
+      return(trimws(parts[1]))
+    }
+
+    return("Unknown")
+  }
+
+  # Extract drc_results if batch_drc_results is the wrapper object
+  if (is.list(batch_drc_results)) {
+    if ("drc_results" %in% names(batch_drc_results)) {
+      if (verbose) message("Detected batch_drc_analysis wrapper. Extracting drc_results...")
+      drc_results <- batch_drc_results$drc_results
     } else {
-      all_plates
+      drc_results <- batch_drc_results
     }
-
-    for (plate_name in target_plates) {
-      plate_res_list <- get_detailed_results(batch_results[[plate_name]])
-      if (is.null(plate_res_list)) next
-
-      for (i in seq_along(plate_res_list)) {
-        res <- plate_res_list[[i]]
-
-        # Check if fit was successful
-        has_success <- !is.null(res$success) && isTRUE(res$success)
-        if (!has_success) next
-
-        # Parse construct and compound names
-        info <- tryCatch({
-          raw_name <- res$compound
-          if (is.null(raw_name)) raw_name <- paste0("Unknown_", i)
-
-          clean <- trimws(gsub("\\.\\d+$", "", raw_name))
-
-          # Handle "Construct | Compound" format
-          if (grepl(" \\| ", clean)) {
-            parts <- strsplit(clean, " \\| ")[[1]]
-            clean <- parts[1]
-          }
-
-          parts <- strsplit(clean, ":")[[1]]
-          parts <- trimws(parts)
-
-          if (length(parts) >= 2) {
-            list(construct = parts[1], compound = parts[2])
-          } else {
-            list(construct = parts[1], compound = parts[1])
-          }
-        }, error = function(e) {
-          list(construct = "Unknown", compound = "Unknown")
-        })
-
-        # Skip excluded compounds
-        if (!is.null(compounds_to_exclude) && info$compound %in% compounds_to_exclude) {
-          next
-        }
-
-        combos_list[[length(combos_list) + 1]] <- data.frame(
-          plate = plate_name,
-          construct = info$construct,
-          compound = info$compound,
-          construct_compound = paste(info$construct, info$compound, sep = ":"),
-          stringsAsFactors = FALSE
-        )
-      }
-    }
-
-    if (length(combos_list) == 0) return(NULL)
-    return(dplyr::bind_rows(combos_list))
+  } else {
+    stop("batch_drc_results must be a list")
   }
 
-  if (verbose) message("Scanning results for successful fits...")
-  combos_df <- extract_combinations(batch_drc_results)
-
-  if (is.null(combos_df) || nrow(combos_df) == 0) {
-    warning("No valid/successful DRC results found to plot.")
-    return(invisible(NULL))
+  # Get plate names
+  plate_names <- names(drc_results)
+  if (is.null(plate_names) || length(plate_names) == 0) {
+    stop("No plates found in drc_results")
   }
 
-  # ============================================================================
-  # 3. SETUP OUTPUT DIRECTORY STRUCTURE
-  # ============================================================================
+  # Filter plates if specified
+  if (!is.null(plates_to_plot)) {
+    plate_names <- intersect(plate_names, plates_to_plot)
+    if (length(plate_names) == 0) {
+      stop("No valid plates specified")
+    }
+  }
+
+  if (verbose) {
+    message("Found ", length(plate_names), " plates to process")
+    message("Output directory: ", output_dir)
+  }
+
+  # Create main output directory
   if (!dir.exists(output_dir)) {
     dir.create(output_dir, recursive = TRUE)
   }
 
-  if (create_subfolders) {
-    for (plate in unique(combos_df$plate)) {
-      plate_path <- file.path(output_dir, make_safe_filename(plate))
-      if (!dir.exists(plate_path)) {
-        dir.create(plate_path, recursive = TRUE)
-      }
-    }
-  }
-
   # ============================================================================
-  # 4. GENERATE AND SAVE PLOTS
+  # 2. SCAN FOR VALID COMPOUNDS ACROSS ALL PLATES
   # ============================================================================
-  total_plots <- nrow(combos_df)
-  successes <- 0
-  failures <- 0
 
-  if (verbose) {
-    message("Starting generation of ", total_plots, " plots...")
-    pb <- txtProgressBar(min = 0, max = total_plots, style = 3)
-  }
+  if (verbose) message("\nScanning for valid compounds...")
 
-  for (i in seq_len(total_plots)) {
-    combo <- combos_df[i, ]
+  compounds_list <- list()
 
-    safe_construct <- make_safe_filename(combo$construct)
-    safe_compound <- make_safe_filename(combo$compound)
-    safe_plate <- make_safe_filename(combo$plate)
+  for (plate_name in plate_names) {
+    plate <- drc_results[[plate_name]]
 
-    # Generate filename
-    if (create_subfolders) {
-      filename <- sprintf("%s_%s_%s.%s", file_prefix, safe_construct, safe_compound, file_extension)
-      output_path <- file.path(output_dir, safe_plate, filename)
-    } else {
-      filename <- sprintf("%s_%s_%s_%s.%s", file_prefix, safe_construct, safe_compound, safe_plate, file_extension)
-      output_path <- file.path(output_dir, filename)
-    }
-
-    # Skip if file exists and overwrite is FALSE
-    if (file.exists(output_path) && !overwrite) {
-      if (verbose) setTxtProgressBar(pb, i)
+    # Check if plate has drc_result
+    if (is.null(plate$drc_result)) {
+      if (verbose > 1) message("  Skipping ", plate_name, ": no drc_result")
       next
     }
 
-    # Generate and save plot
+    # Get detailed results
+    detailed <- plate$drc_result$detailed_results
+    if (is.null(detailed) || !is.list(detailed)) {
+      if (verbose > 1) message("  Skipping ", plate_name, ": no detailed_results")
+      next
+    }
+
+    # For each compound in the plate
+    for (i in seq_along(detailed)) {
+      result <- detailed[[i]]
+
+      # Check if fit was successful
+      if (!isTRUE(result$success)) next
+
+      # Get compound and construct names
+      compound_name <- extract_compound_name(result$compound)
+      construct_name <- extract_construct_name(result$compound)
+
+      # Filter by compound if specified
+      if (!is.null(compounds_to_plot) && !compound_name %in% compounds_to_plot) next
+
+      # Store compound info
+      compounds_list <- append(compounds_list, list(list(
+        plate = plate_name,
+        construct = construct_name,
+        compound = compound_name,
+        compound_full = result$compound,
+        index = i,
+        results_obj = plate$drc_result  # Pass the full results object for plot_dose_response
+      )))
+    }
+  }
+
+  if (length(compounds_list) == 0) {
+    stop("No valid compounds found to plot")
+  }
+
+  if (verbose) {
+    message("Found ", length(compounds_list), " valid compounds")
+    message("  - Plates: ", paste(unique(sapply(compounds_list, function(x) x$plate)), collapse = ", "))
+    message("  - Compounds: ", length(unique(sapply(compounds_list, function(x) x$compound))))
+  }
+
+  # ============================================================================
+  # 3. CREATE DIRECTORY STRUCTURE
+  # ============================================================================
+
+  if (organize_by == "plate") {
+    # Create subfolders for each plate
+    for (plate_name in unique(sapply(compounds_list, function(x) x$plate))) {
+      plate_dir <- file.path(output_dir, safe_filename(plate_name))
+      if (!dir.exists(plate_dir)) {
+        dir.create(plate_dir, recursive = TRUE)
+      }
+    }
+  } else if (organize_by == "compound") {
+    # Create subfolders for each compound
+    for (compound_name in unique(sapply(compounds_list, function(x) x$compound))) {
+      compound_dir <- file.path(output_dir, safe_filename(compound_name))
+      if (!dir.exists(compound_dir)) {
+        dir.create(compound_dir, recursive = TRUE)
+      }
+    }
+  }
+
+  # ============================================================================
+  # 4. GENERATE ALL PLOTS
+  # ============================================================================
+
+  if (verbose) message("\nGenerating plots...")
+
+  total <- length(compounds_list)
+  successes <- 0
+  failures <- 0
+  failed_list <- character()
+  error_messages <- list()
+
+  # Progress bar
+  if (verbose) {
+    pb <- txtProgressBar(min = 0, max = total, style = 3)
+  }
+
+  for (i in seq_along(compounds_list)) {
+    info <- compounds_list[[i]]
+
+    # Determine output path based on organization
+    if (organize_by == "plate") {
+      # plate/compound.format
+      filename <- paste0(safe_filename(info$compound), ".", format)
+      output_path <- file.path(output_dir, safe_filename(info$plate), filename)
+    } else if (organize_by == "compound") {
+      # compound/plate.format
+      filename <- paste0(safe_filename(info$plate), "_", safe_filename(info$compound), ".", format)
+      output_path <- file.path(output_dir, safe_filename(info$compound), filename)
+    } else {
+      # flat: plate_compound.format
+      filename <- paste0(safe_filename(info$plate), "_", safe_filename(info$compound), ".", format)
+      output_path <- file.path(output_dir, filename)
+    }
+
+    # Create directory if it doesn't exist
+    dir.create(dirname(output_path), showWarnings = FALSE, recursive = TRUE)
+
+    # Generate plot
     tryCatch({
-      suppressMessages({
-        plot_drc_batch(
-          batch_drc_results = batch_drc_results,
-          construct_compound = combo$construct_compound,
-          save_plot = output_path,
-          verbose = FALSE,
-          show_legend = show_legend,
-          plot_title = combo$compound,
-          ...
-        )
-      })
+      # Call plot_dose_response with the correct parameters
+      # Set point_color to black (default) and let other parameters pass through
+      plot_dose_response(
+        results = info$results_obj,
+        compound_index = info$index,
+        save_plot = output_path,
+        plot_width = width,
+        plot_height = height,
+        plot_dpi = dpi,
+        point_color = point_color,  # Passando a cor dos pontos (padrão = "black")
+        show_ic50_line = show_ic50_line,
+        verbose = FALSE,
+        plot_title = plot_title,
+        point_size = point_size,
+        ...  # Pass any additional arguments to plot_dose_response
+      )
       successes <- successes + 1
     }, error = function(e) {
       failures <- failures + 1
-      if (verbose) {
-        warning(sprintf("Failed to plot %s: %s", combo$construct_compound, e$message))
-      }
+      failed_list <<- c(failed_list, paste(info$plate, info$compound, sep = "/"))
+      error_messages[[length(error_messages) + 1]] <<- paste(info$plate, info$compound, ":", e$message)
     })
 
     if (verbose) setTxtProgressBar(pb, i)
   }
 
+  if (verbose) close(pb)
+
+  # ============================================================================
+  # 5. SUMMARY AND RETURN
+  # ============================================================================
+
   if (verbose) {
-    close(pb)
-    message("\nComplete! Successful: ", successes, " | Failed: ", failures)
-    message("Plots saved to: ", normalizePath(output_dir))
+    message("\n")
+    message("========================================")
+    message("PLOT GENERATION COMPLETE")
+    message("========================================")
+    message("Total compounds: ", total)
+    message("Successful: ", successes)
+    message("Failed: ", failures)
+    message("Point color: ", point_color)  # Mostrar a cor usada
+    message("Output directory: ", normalizePath(output_dir))
+
+    if (failures > 0) {
+      message("\nFailed compounds:")
+      for (f in failed_list) {
+        message("  - ", f)
+      }
+
+      if (verbose > 1) {
+        message("\nError details:")
+        for (err in error_messages) {
+          message("  - ", err)
+        }
+      }
+    }
+
+    # Show directory structure
+    message("\nDirectory structure:")
+    if (organize_by == "plate") {
+      for (plate in unique(sapply(compounds_list, function(x) x$plate))) {
+        plate_files <- list.files(file.path(output_dir, safe_filename(plate)), pattern = paste0("\\.", format, "$"))
+        message("  ", plate, "/ : ", length(plate_files), " files")
+      }
+    } else if (organize_by == "compound") {
+      for (compound in unique(sapply(compounds_list, function(x) x$compound))) {
+        compound_files <- list.files(file.path(output_dir, safe_filename(compound)), pattern = paste0("\\.", format, "$"))
+        message("  ", compound, "/ : ", length(compound_files), " files")
+      }
+    } else {
+      all_files <- list.files(output_dir, pattern = paste0("\\.", format, "$"))
+      message("  Flat structure: ", length(all_files), " files in root")
+    }
   }
 
   # ============================================================================
-  # 5. RETURN SUMMARY
+  # 6. RETURN INVISIBLE SUMMARY
   # ============================================================================
-  return(invisible(list(
-    total = total_plots,
-    success = successes,
-    failed = failures,
-    output_dir = output_dir
-  )))
+
+  invisible(list(
+    total = total,
+    successes = successes,
+    failures = failures,
+    failed_compounds = failed_list,
+    error_messages = error_messages,
+    output_dir = output_dir,
+    organization = organize_by,
+    point_color = point_color,
+    timestamp = Sys.time()
+  ))
 }
+

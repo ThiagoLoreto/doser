@@ -305,51 +305,71 @@ batch_drc_analysis <- function(batch_results,
 
           ideal_hill <- res$ideal_hill_slope %||% NA_real_
 
-          # --- FLAGS ---
-          flag_collector <- character()
+          # --- WARNING AND EXCLUSION FLAGS ---
+          warning_collector <- character()
+          exclusion_collector <- character()
 
+          # CI Analysis
           if (is.na(pic50_diff_lower) || is.na(pic50_diff_upper)) {
-            flag_collector <- c(flag_collector, "Undefined CI")
+            exclusion_collector <- c(exclusion_collector, "Undefined CI")
           } else {
             # 3-fold = log10(3) = 0.47712
             # 5-fold = log10(5) = 0.69897
-            ci_flags <- character()
+            ci_warnings <- character()
+            ci_exclusions <- character()
 
             if (pic50_diff_lower > 0.69897) {
-              ci_flags <- c(ci_flags, sprintf("Lower CI >5-fold (%.3f)", pic50_diff_lower))
+              ci_exclusions <- c(ci_exclusions, sprintf("Lower CI >5-fold (%.3f)", pic50_diff_lower))
             } else if (pic50_diff_lower > 0.47712) {
-              ci_flags <- c(ci_flags, sprintf("Lower CI >3-fold (%.3f)", pic50_diff_lower))
+              ci_warnings <- c(ci_warnings, sprintf("Lower CI >3-fold (%.3f)", pic50_diff_lower))
             }
 
             if (pic50_diff_upper > 0.69897) {
-              ci_flags <- c(ci_flags, sprintf("Upper CI >5-fold (%.3f)", pic50_diff_upper))
+              ci_exclusions <- c(ci_exclusions, sprintf("Upper CI >5-fold (%.3f)", pic50_diff_upper))
             } else if (pic50_diff_upper > 0.47712) {
-              ci_flags <- c(ci_flags, sprintf("Upper CI >3-fold (%.3f)", pic50_diff_upper))
+              ci_warnings <- c(ci_warnings, sprintf("Upper CI >3-fold (%.3f)", pic50_diff_upper))
             }
 
-            if (length(ci_flags) > 0) {
-              flag_collector <- c(flag_collector, paste(ci_flags, collapse = "; "))
+            if (length(ci_warnings) > 0) {
+              warning_collector <- c(warning_collector, paste(ci_warnings, collapse = "; "))
+            }
+            if (length(ci_exclusions) > 0) {
+              exclusion_collector <- c(exclusion_collector, paste(ci_exclusions, collapse = "; "))
             }
           }
 
+          # Hill Slope Analysis
           if (!is.na(ideal_hill)) {
             curve_type <- res$curve_type %||% "unknown"
+            hill_message <- ""
+
             if (curve_type == "activation") {
-              if (ideal_hill < 0.5 || ideal_hill > 1.5) flag_collector <- c(flag_collector, "Hill Slope (expected 0.5-1.5)")
+              if (ideal_hill < 0.5 || ideal_hill > 1.5) {
+                hill_message <- sprintf("Hill Slope (expected 0.5-1.5): %.3f", ideal_hill)
+              }
             } else {
-              if (ideal_hill > -0.5 || ideal_hill < -1.5) flag_collector <- c(flag_collector, "Hill Slope (expected -1.5 to -0.5)")
+              if (ideal_hill > -0.5 || ideal_hill < -1.5) {
+                hill_message <- sprintf("Hill Slope (expected -1.5 to -0.5): %.3f", ideal_hill)
+              }
+            }
+
+            if (nchar(hill_message) > 0) {
+              warning_collector <- c(warning_collector, hill_message)
             }
           }
 
+          # Normalized Span Analysis
           if (!is.na(span_ratio)) {
             if (span_ratio < 0.5) {
-              flag_collector <- c(flag_collector, sprintf("Norm Span < 0.5 (%.2f)", span_ratio))
+              exclusion_collector <- c(exclusion_collector, sprintf("Norm Span < 0.5 (%.2f)", span_ratio))
             } else if (span_ratio > 1.5) {
-              flag_collector <- c(flag_collector, sprintf("Norm Span > 1.5 (%.2f)", span_ratio))
+              exclusion_collector <- c(exclusion_collector, sprintf("Norm Span > 1.5 (%.2f)", span_ratio))
             }
           }
 
-          final_flags <- if (length(flag_collector) > 0) paste(flag_collector, collapse = "; ") else "OK"
+          # Set "OK" for empty collectors
+          final_warnings <- if (length(warning_collector) > 0) paste(warning_collector, collapse = "; ") else "OK"
+          final_exclusions <- if (length(exclusion_collector) > 0) paste(exclusion_collector, collapse = "; ") else "OK"
 
           pharm_list[[length(pharm_list) + 1]] <- data.frame(
             Plate = plate_name,
@@ -360,7 +380,8 @@ batch_drc_analysis <- function(batch_results,
             CI_95_Lower = round(pic50_diff_lower, 3),
             Ideal_Hill_Slope = round(ideal_hill, 3),
             Normalized_Span = round(span_ratio, 3),
-            Flags = final_flags,
+            Warning = final_warnings,
+            Exclusion = final_exclusions,
             stringsAsFactors = FALSE
           )
         }
@@ -570,3 +591,4 @@ batch_drc_analysis <- function(batch_results,
     report_info = report_info
   )))
 }
+

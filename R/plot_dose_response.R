@@ -11,26 +11,29 @@
 #' @param point_color Color for data points (default: "black").
 #' @param line_color Color for fitted curve (default: "black").
 #' @param ic50_line_color Color for IC50 vertical line (default: "gray").
-#' @param point_size Size multiplier for data points (default: 1).
+#' @param point_size Size multiplier for data points (default: 2).
 #' @param line_width Line width for fitted curve (default: 2).
 #' @param error_bar_width Width of error bar ends (default: 0.01).
-#' @param show_ic50_line Logical indicating whether to show vertical IC50 line (default: TRUE).
+#' @param show_ic50_line Logical indicating whether to show vertical IC50 line (default: FALSE).
 #' @param show_legend Logical indicating whether to show parameter legend (default: FALSE).
 #' @param show_grid Logical indicating whether to show background grid (default: FALSE).
 #' @param save_plot Defines whether to save the plot: \code{NULL} (do not save, default),
 #'   \code{TRUE} (automatically saves as PNG with default name), or a file path with extension
 #'   (\code{.png}, \code{.pdf}, \code{.jpeg}, \code{.tiff}, \code{.svg}, \code{.eps}) to save in a specific format.
 #' @param plot_width Plot width in inches for saved plots (default: 10).
-#' @param plot_height Plot height in inches for saved plots (default: 8).
+#' @param plot_height Plot height in inches for saved plots (default: 10).
 #' @param plot_dpi Resolution for saved raster images (default: 600).
-#' @param axis_label_size Font size for axis labels (default: 14).
-#' @param axis_text_size Font size for axis numbers (default: 14).
+#' @param axis_label_size Font size for axis labels (default: 20).
+#' @param axis_text_size Font size for axis numbers (default: 18).
 #' @param x_axis_title Custom x-axis title. If NULL, uses default expression.
 #' @param y_axis_title Custom y-axis title. If NULL, uses default based on normalization.
 #' @param enforce_bottom_threshold Logical indicating whether bottom threshold enforcement
 #'   was used in analysis (default: NULL, auto-detected from results).
 #' @param bottom_threshold Numeric value for bottom threshold (default: 60).
 #' @param verbose Logical indicating whether to show verbose messages (default: FALSE).
+#' @param plot_title Controls the plot title. \code{FALSE} (default) = no title;
+#'   \code{TRUE} = automatic title (construct + compound name);
+#'   character = custom title text.
 #'
 #' @importFrom ggplot2 aes
 #'
@@ -169,13 +172,14 @@
 
 plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150),
                                point_color = "black", line_color = "black",
-                               ic50_line_color = "gray", point_size = 1,
+                               ic50_line_color = "gray", point_size = 2,
                                line_width = 2, error_bar_width = 0.01,
-                               show_ic50_line = TRUE, show_legend = TRUE,
+                               show_ic50_line = TRUE, show_legend = FALSE,
                                show_grid = FALSE, save_plot = NULL,
-                               plot_width = 10, plot_height = 8, plot_dpi = 600,
-                               axis_label_size = 14, axis_text_size = 14,
+                               plot_width = 10, plot_height = 10, plot_dpi = 600,
+                               axis_label_size = 20, axis_text_size = 18,
                                x_axis_title = NULL, y_axis_title = NULL,
+                               plot_title = TRUE,
                                enforce_bottom_threshold = NULL, bottom_threshold = 60,
                                verbose = FALSE) {
 
@@ -262,7 +266,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
   # Extract compound name (remove plate info if present)
   compound_name_display <- strsplit(result$compound, " \\| ")[[1]][1]
 
-  # Check if IC50 was excluded due to threshold - CORRIGIDO
+  # Check if IC50 was excluded due to threshold
   ic50_excluded <- FALSE
   if (!is.null(enforce_bottom_threshold) && isTRUE(enforce_bottom_threshold)) {
     comp_name <- strsplit(result$compound, " \\| ")[[1]][1]
@@ -337,7 +341,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     }, error = function(e) NA)
   }
 
-  # Create legend text - CORRIGIDO
+  # Create legend text
   create_legend_content <- function(model = NULL) {
     if (!show_legend) return(NULL)
 
@@ -374,12 +378,31 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
   log_ic50 <- if (model_success) get_ic50_value(result$model) else NA
   legend_content <- create_legend_content(if (model_success) result$model else NULL)
 
+  # ============================================================================
+  # DETERMINAR O TÍTULO BASEADO NO ARGUMENTO plot_title
+  # ============================================================================
+
+  final_title <- NULL  # Default: sem título
+
+  if (is.character(plot_title)) {
+    # Se for string, usa o título personalizado
+    final_title <- plot_title
+  } else if (isTRUE(plot_title)) {
+    # Se for TRUE, usa título automático
+    if (model_success) {
+      final_title <- compound_name_display
+    } else {
+      final_title <- paste(compound_name_display, "(Model failed)")
+    }
+  }
+  # Se for FALSE ou NULL, final_title permanece NULL (sem título)
+
   # Create base plot with professional styling
   p <- ggplot2::ggplot() +
     ggplot2::labs(
       x = plot_config$x_lab,
       y = plot_config$y_lab,
-      title = if (model_success) compound_name_display else paste(compound_name_display, "(Model failed)")
+      title = final_title  # Pode ser NULL, string ou automático
     ) +
     ggplot2::coord_cartesian(ylim = y_limits) +
     ggplot2::theme_minimal() +
@@ -438,7 +461,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
       )
   }
 
-  # Add IC50 line only if valid IC50 exists - CORRIGIDO
+  # Add IC50 line only if valid IC50 exists
   if (show_ic50_line && is.finite(log_ic50) &&
       !(!is.null(ic50_excluded) && ic50_excluded)) {
     p <- p +
@@ -517,7 +540,8 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
     plot_dimensions = c(width = plot_width, height = plot_height, dpi = plot_dpi),
     timestamp = Sys.time(),
     ic50_excluded = ic50_excluded,
-    log_ic50 = if (model_success) log_ic50 else NA
+    log_ic50 = if (model_success) log_ic50 else NA,
+    title_mode = if (is.character(plot_title)) "custom" else if (isTRUE(plot_title)) "auto" else "none"
   )
 
   attr(p, "metadata") <- metadata
