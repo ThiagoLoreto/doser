@@ -2,7 +2,7 @@
 % Please edit documentation in R/ratio_dose_response_v2.R
 \name{ratio_dose_response_v2}
 \alias{ratio_dose_response_v2}
-\title{Process and Analyze Dose-Response Ratio Data with Flexible Control Options}
+\title{Dose–Response Ratio Processing and Normalization Function}
 \usage{
 ratio_dose_response_v2(
   data,
@@ -17,215 +17,162 @@ ratio_dose_response_v2(
 )
 }
 \arguments{
-\item{data}{Data frame containing \strong{raw dose-response experimental data} with specific
-structure typically exported from plate readers. Must have at least 43 rows with
-column names in row 9.}
+\item{data}{A data.frame containing the raw plate data. Must have at least 43 rows.}
 
-\item{control_0perc}{\strong{Either} a single numeric value (e.g., 16) for fixed 0\% control
-\strong{or} a character string specifying the column name for 0\% control (background control).
-When using fixed value, a new column 'Fixed_0perc' is created with this value.}
+\item{control_0perc}{Defines the 0\% control. Can be:
+\itemize{
+\item A single numeric value (fixed baseline)
+\item A column name (character)
+}}
 
-\item{control_100perc}{\strong{Either} a numeric vector of column positions (e.g., c(12, 24))
-\strong{or} a character vector of column names for 100\% control(s). When using multiple
-columns, their row-wise means are calculated to create a new 'Mean_100perc' column.}
+\item{control_100perc}{Defines the 100\% control. Can be:
+\itemize{
+\item Numeric indices of columns (relative to data columns, excluding row names)
+\item Column name(s) (character vector)
+}}
 
-\item{split_replicates}{Logical indicating whether to split experimental replicates
-into separate columns (default: TRUE). Creates technical replicates with ".2" suffix.}
+\item{split_replicates}{Logical. If TRUE, splits experimental rows into two
+technical replicates assuming symmetrical layout.}
 
-\item{info_table}{Data frame with experimental metadata containing at least 4 columns:
-log(inhibitor), Plate_Row, Construct, and Compound information.}
+\item{info_table}{Optional data.frame containing metadata. Must contain at least:
+\itemize{
+\item Column 1: log(inhibitor)
+\item Column 2: Plate row identifiers
+\item Column 3: Construct
+\item Column 4: Compound
+}}
 
-\item{save_to_excel}{Character string specifying Excel file path for saving processed results
-(default: NULL, no saving).}
+\item{save_to_excel}{Optional file path (character). If provided, results are saved
+as an Excel file using the \code{openxlsx} package.}
 
-\item{verbose}{Logical indicating whether to display progress messages (default: TRUE).}
+\item{verbose}{Logical. If TRUE, prints progress messages and warnings.}
 
-\item{low_value_threshold}{Numeric threshold for filtering low luciferase signals
-(default: 3000). Values below this are replaced with NA.}
+\item{low_value_threshold}{Numeric. Values in the luciferase table below this
+threshold are replaced with NA to avoid noise artifacts.}
+
+\item{selected_columns}{Optional numeric vector specifying which data columns
+to use (excluding the first column with row identifiers).}
 }
 \value{
-A list containing the following components:
-\itemize{
-\item \code{original_ratio_table}: Original calculated ratio table from data
-\item \code{modified_ratio_table}: Processed and formatted table ready for analysis
-\item \code{general_means}: Data frame with general control means (when controls provided)
-\item \code{interval_means}: Data frame with construct-specific means and quality metrics
-\item \code{construct_intervals}: List mapping constructs to row intervals
-\item \code{control_info}: Information about how controls were processed
+A list containing:
+\describe{
+\item{modified_ratio_table}{Final processed table (transposed, normalized,
+optionally split into replicates, and optionally annotated with log concentrations)}
+
+\item{original_ratio_table}{Raw ratio matrix before normalization and transformation}
+
+\item{general_means}{(Optional) Mean values for control columns}
+
+\item{interval_means}{(Optional) Construct-level quality metrics including
+Z-score, assay window, and signal classification}
+
+\item{construct_intervals}{Mapping of constructs to plate row intervals}
+
+\item{control_info}{Details about how controls were interpreted and applied}
+
+\item{selected_columns_info}{Information about column selection used}
 }
 }
 \description{
-Processes experimental data from dose-response assays to calculate ratios,
-perform quality assessment, and prepare data for downstream curve fitting analysis.
-This enhanced version supports both traditional column-based controls and new fixed-value
-controls with multiple 100\% control columns.
+This function processes dual-readout plate data (e.g., luciferase and a normalizer),
+calculates ratios, applies optional normalization to controls (0\% and 100\%),
+performs quality control metrics, handles replicate splitting, and optionally
+exports results to Excel.
+
+It is designed for high-throughput dose–response experiments where two signals
+(e.g., reporter and normalization control) are measured across multiple wells.
 }
 \details{
-This function processes dose-response data through a comprehensive pipeline. The enhanced
-version supports two control specification modes:
-
-\strong{New Fixed-Value Mode (Recommended for New Experiments):}
+The function expects a raw data table structured similarly to plate-reader exports:
 \itemize{
-\item \code{control_0perc = 16}: Uses fixed value 16 for all 0\% control measurements
-\item \code{control_100perc = c(12, 24)}: Uses columns 12 and 24 as duplicate 100\% controls
-\item Creates new columns: 'Fixed_0perc' (all values = 16) and 'Mean_100perc' (row-wise means)
-\item Removes original 100\% control columns after calculating means
-\item Reorganizes: Fixed_0perc (first), experimental columns (middle), Mean_100perc (last)
+\item Row 9: column names
+\item Rows 10–25: first measurement (e.g., luciferase)
+\item Rows 28–43: second measurement (e.g., normalizer)
 }
 
-\strong{Traditional Column Name Mode (Backward Compatible):}
+The ratio is calculated as:
+\deqn{ratio = (normalizer / luciferase) * 1000}
+
+Additional processing includes:
 \itemize{
-\item \code{control_0perc = "DMSO"}: Uses column named "DMSO" for 0\% control
-\item \code{control_100perc = "Staurosporine"}: Uses single column for 100\% control
-\item Maintains original column structure and positions
-}
-
-\strong{Key Features of Enhanced Version:}
+\item Filtering low luciferase values (below \code{low_value_threshold})
+\item Handling division by zero
+\item Flexible control definition (fixed value or column-based)
+\item Construction of normalized tables with 0\% and 100\% controls
+\item Optional splitting of technical replicates
+\item Integration with metadata (\code{info_table}) for labeling and QC metrics
+\item Calculation of assay quality metrics:
 \itemize{
-\item \strong{Flexible Control Specification}: Accepts both fixed values and column names/positions
-\item \strong{Multiple 100\% Controls}: Automatically averages duplicate 100\% control columns
-\item \strong{Automatic Biological Replicate Handling}: Distinguishes replicates with suffixes
-\item \strong{Quality Control Metrics}: Calculates Z-score, assay window, and signal quality
-\item \strong{Technical Replicate Splitting}: Separates replicates into distinct columns
-\item \strong{Metadata Integration}: Maps experimental metadata to data columns
+\item Z-score
+\item Assay window
+\item Signal quality classification
 }
-
-\strong{Data Processing Pipeline:}
-\enumerate{
-\item \strong{Data Validation}: Checks minimum row requirements and structure
-\item \strong{Subtable Extraction}: Separates measurement subtables (rows 10-25 and 28-43)
-\item \strong{Low Value Filtering}: Replaces values below threshold with NA
-\item \strong{Ratio Calculation}: Computes (subtable2 / subtable1) * 1000
-\item \strong{Control Processing}: Implements fixed-value or column-based control strategy
-\item \strong{Quality Assessment}: Calculates metrics for each construct
-\item \strong{Data Transformation}: Transposes and renames columns based on metadata
-\item \strong{Replicate Splitting}: Separates technical replicates if requested
-\item \strong{Log(Inhibitor) Addition}: Adds concentration information as first column
+\item Optional Excel export with multiple sheets
 }
-
-\strong{Data Structure Requirements:}
-\preformatted{
-  Rows 1-8:     Headers and metadata (ignored)
-  Row 9:        Column names for data extraction
-  Rows 10-25:   First measurement (e.g., donor channel)
-  Rows 26-27:   Separator (ignored)
-  Rows 28-43:   Second measurement (e.g., acceptor channel)
 }
+\section{Control Handling}{
 
-\strong{Quality Metrics (When info_table Provided):}
+Two normalization strategies are supported:
+
+\strong{1. Fixed 0\% control + column-based 100\% control}
 \itemize{
-\item \strong{Luciferase Signal}: >100000 (high), 10000-100000 (medium), 1000-10000 (low)
-\item \strong{Assay Window}: >3 (high), 2-3 (medium), 1.5-2 (low)
-\item \strong{Z-Score}: >0.7 (high), 0.5-0.7 (medium), 0.25-0.5 (low)
-\item \strong{Overall Quality}: Determined by lowest-performing metric
-}
-}
-\section{Control Processing Details}{
-
-\strong{When using fixed-value mode (control_0perc is numeric):}
-\enumerate{
-\item Creates new column 'Fixed_0perc' with all values equal to control_0perc
-\item Calculates row-wise means of specified 100\% control columns
-\item Creates new column 'Mean_100perc' with these averages
-\item Removes original 100\% control columns from the data
-\item Reorganizes columns: Fixed_0perc → experimental columns → Mean_100perc
-\item After transposition: Fixed_0perc becomes first row, Mean_100perc becomes last row
+\item Creates a \code{Fixed_0perc} column
+\item Computes \code{Mean_100perc} from selected columns
+\item Removes original 100\% control columns
 }
 
-\strong{When using column name mode (control_0perc is character):}
-\enumerate{
-\item Uses specified columns directly as controls
-\item Reorganizes columns: control_0perc column → experimental columns → control_100perc column
-\item No new columns created, original structure maintained
-}
-}
-
-\section{Biological Replicate Handling}{
-
-The function automatically detects and distinguishes biological replicates
-(same Construct:Compound combination) by adding numeric suffixes:
+\strong{2. Column-based 0\% and 100\% controls}
 \itemize{
-\item First occurrence: "PIP4K2C:AZ-3458"
-\item Second occurrence: "PIP4K2C:AZ-3458_2"
-\item Third occurrence: "PIP4K2C:AZ-3458_3"
-}
-This allows proper analysis of replicate experiments within the same dataset.
-}
-
-\section{Output Structure}{
-
-The modified_ratio_table has the following structure:
-\preformatted{
-  Column 1:    log(inhibitor) concentration values (first row = NA)
-  Columns 2-n: Experimental constructs (with .2 suffix for second technical replicate)
-
-  Row structure:
-  - Row 1:      0% control values (Fixed_0perc if using fixed-value mode)
-  - Rows 2-(n-1): Experimental concentration measurements
-  - Row n:      100% control values (Mean_100perc if using fixed-value mode)
+\item Keeps both control columns in the dataset
+\item Reorders columns for consistency
 }
 }
 
-\section{Note on Control Specifications}{
+\section{Quality Metrics}{
+
+When both controls and \code{info_table} are provided, the function computes:
 
 \itemize{
-\item For \strong{new experiments}, use fixed-value mode: \code{control_0perc = 16, control_100perc = c(12, 24)}
-\item For \strong{legacy data compatibility}, use column name mode: \code{control_0perc = "ColumnName", control_100perc = "ColumnName"}
-\item You can mix modes: fixed 0\% with named 100\% control or vice versa
-\item Column positions are 1-indexed (first data column after row names = position 1)
+\item Z-score:
+\deqn{Z = 1 - (3 * (SD_{pos} + SD_{bg}) / (Mean_{pos} - Mean_{bg}))}
+
+\item Assay window:
+\deqn{Assay\ Window = Mean_{pos} / Mean_{bg}}
+
+\item Signal classification:
+\itemize{
+\item High, medium, low, or insufficient
+}
+}
+}
+
+\section{Important Notes}{
+
+\itemize{
+\item The function assumes a fixed plate layout structure.
+\item Replicate splitting assumes symmetric experimental design.
+\item If \code{info_table} is NULL, no concentration column is added, which may
+affect compatibility with downstream analysis functions.
+\item Low luciferase values are automatically filtered to prevent ratio artifacts.
 }
 }
 
 \examples{
 \dontrun{
-# --- NEW FIXED-VALUE MODE (Recommended) ---
-# Using fixed 0\% control and column positions for 100\% control
-processed_data <- ratio_dose_response_v2(
-  data = raw_experimental_data,
-  control_0perc = 16,                # Fixed value for 0\% control
-  control_100perc = c(12, 24),       # Column positions for duplicate 100\% controls
-  info_table = experiment_design,
+result <- ratio_dose_response_v2(
+  data = my_data,
+  control_0perc = 0,
+  control_100perc = c(1, 2),
+  info_table = metadata,
   split_replicates = TRUE,
-  save_to_excel = "processed_results.xlsx"
+  save_to_excel = "output.xlsx"
 )
 
-# Access the processed table ready for curve fitting
-analysis_ready <- processed_data$modified_ratio_table
-
-# View quality metrics for each construct
-quality_metrics <- processed_data$interval_means
-
-# --- TRADITIONAL MODE (Backward Compatible) ---
-# Using column names for both controls
-processed_old <- ratio_dose_response_v2(
-  data = raw_experimental_data,
-  control_0perc = "DMSO_Control",
-  control_100perc = "Staurosporine_100pct",
-  info_table = experiment_design
-)
-
-# --- WITHOUT METADATA (Basic Processing) ---
-# Just calculate ratios with new control structure
-basic_processed <- ratio_dose_response_v2(
-  data = raw_data,
-  control_0perc = 16,
-  control_100perc = c(12, 24),
-  info_table = NULL,
-  split_replicates = FALSE
-)
+# Access processed table
+result$modified_ratio_table
 }
 
-}
-\references{
-For dose-response data processing and quality control:
-\itemize{
-\item "Dose-Response Data Analysis in Drug Discovery" (Motulsky & Christopoulos, 2004)
-\item "Assay Guidance Manual: Quantitative Biology and Pharmacology in Preclinical Drug Discovery" (NIH)
-\item "Best Practices in Dose-Response Assay Development" (Journal of Biomolecular Screening)
-}
 }
 \seealso{
-\code{\link{fit_drc_3pl}} for dose-response curve fitting
-\code{\link{plot_dose_response}} for visualization
-\code{\link{calculate_assay_metrics}} for additional quality assessments
+Useful for downstream dose–response modeling and outlier detection pipelines.
 }

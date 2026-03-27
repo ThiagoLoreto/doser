@@ -33,7 +33,11 @@ Imports:
     tidyr,
     tibble,
     ggsci,
-    viridisLite
+    viridisLite,
+    OptimModel,
+    ggprism,
+    ggrepel,
+    patchwork
 Suggests: 
     stringr,
     lmtest,

@@ -363,7 +363,7 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
         legend_text <- c(legend_text, "IC50 = NA")
       }
 
-      legend_text <- c(legend_text, paste("R² =", r_squared))
+      legend_text <- c(legend_text, paste("R2 =", r_squared))
 
       return(legend_text)
 
@@ -379,30 +379,27 @@ plot_dose_response <- function(results, compound_index = 1, y_limits = c(0, 150)
   legend_content <- create_legend_content(if (model_success) result$model else NULL)
 
   # ============================================================================
-  # DETERMINAR O TÍTULO BASEADO NO ARGUMENTO plot_title
+  # Determine the title based on argument plot_title
   # ============================================================================
 
-  final_title <- NULL  # Default: sem título
+  final_title <- NULL
 
   if (is.character(plot_title)) {
-    # Se for string, usa o título personalizado
     final_title <- plot_title
   } else if (isTRUE(plot_title)) {
-    # Se for TRUE, usa título automático
     if (model_success) {
       final_title <- compound_name_display
     } else {
       final_title <- paste(compound_name_display, "(Model failed)")
     }
   }
-  # Se for FALSE ou NULL, final_title permanece NULL (sem título)
 
   # Create base plot with professional styling
   p <- ggplot2::ggplot() +
     ggplot2::labs(
       x = plot_config$x_lab,
       y = plot_config$y_lab,
-      title = final_title  # Pode ser NULL, string ou automático
+      title = final_title
     ) +
     ggplot2::coord_cartesian(ylim = y_limits) +
     ggplot2::theme_minimal() +

@@ -1,141 +1,95 @@
-#' Save all dose-response curves from batch analysis
+#' Batch Save Dose-Response Curve Plots
 #'
-#' @description
-#' Generates and saves dose-response curves for all compounds in a batch analysis
-#' result object. Plots are saved in the specified format and can be organized
-#' by plate, by compound, or in a flat structure.
+#' Generates and saves dose-response curve plots for all valid compounds across
+#' multiple plates from batch DRC analysis results. Plots are saved to disk with
+#' flexible directory organization and customizable aesthetics.
 #'
-#' @param batch_drc_results Output from \code{\link{batch_drc_analysis}}. Can be either
-#'   the complete wrapper object or the extracted \code{drc_results} component.
-#' @param output_dir Character string specifying the main output directory where
-#'   plots will be saved. Default is "DRC_Plots".
-#' @param organize_by Character string specifying how to organize the output files.
-#'   Options are:
-#'   \itemize{
-#'     \item{"plate" (default):}{ Create subfolders for each plate.}
-#'     \item{"compound":}{ Create subfolders for each compound.}
-#'     \item{"flat":}{ Save all plots in the same directory.}
-#'   }
-#' @param compounds_to_plot Optional character vector of compound names to plot.
-#'   If NULL (default), all compounds are plotted.
-#' @param plates_to_plot Optional character vector of plate names to plot.
-#'   If NULL (default), all plates are processed.
-#' @param format Character string specifying the output format for plots.
-#'   Options include "png", "pdf", "svg", "jpeg". Default is "png".
-#' @param width Numeric value specifying the plot width in inches. Default is 10.
-#' @param height Numeric value specifying the plot height in inches. Default is 10.
-#' @param dpi Numeric value specifying the resolution for raster formats (png, jpeg).
-#'   Default is 600.
-#' @param point_color Character string specifying the color of data points.
-#'   Default is "black".
-#' @param point_size Numeric value specifying the size of data points.
-#'   Default is 2.
-#' @param show_ic50_line Logical value indicating whether to show a vertical line
-#'   at the IC50 value. Default is FALSE.
-#' @param plot_title Controls the plot title. Can be:
-#'   \itemize{
-#'     \item{\code{FALSE} (default):}{ No title displayed.}
-#'     \item{\code{TRUE}:}{ Automatic title with compound name.
-#'       If the model failed to converge, adds "(Model failed)" to the title.}
-#'     \item{character:}{ Custom title text applied to all plots.}
-#'   }
-#' @param verbose Logical value indicating whether to display progress messages.
-#'   Default is TRUE.
-#' @param ... Additional arguments passed to \code{\link{plot_dose_response}}.
-#'   See that function's documentation for all available parameters
-#'   (e.g., \code{line_color}, \code{show_legend}, \code{y_limits},
-#'   \code{axis_label_size}, etc.).
+#' This function scans all plates, identifies successfully fitted compounds,
+#' and generates publication-quality plots using \code{plot_dose_response()}.
 #'
-#' @return An invisible list containing:
+#' @param batch_drc_results A list of DRC results. Can be either:
 #'   \itemize{
-#'     \item{\code{total}:}{ Total number of compounds processed.}
-#'     \item{\code{successes}:}{ Number of successfully generated plots.}
-#'     \item{\code{failures}:}{ Number of failed plots.}
-#'     \item{\code{failed_compounds}:}{ Character vector of compounds that failed.}
-#'     \item{\code{error_messages}:}{ List of error messages for failed plots.}
-#'     \item{\code{output_dir}:}{ Path to the output directory.}
-#'     \item{\code{organization}:}{ Organization mode used.}
-#'     \item{\code{point_color}:}{ Color used for data points.}
-#'     \item{\code{timestamp}:}{ Timestamp of when the function was run.}
+#'     \item Output from \code{batch_drc_analysis()} (with \code{$drc_results})
+#'     \item A direct list of plate-level DRC results
 #'   }
+#' @param output_dir Character. Directory where plots will be saved.
+#'   Default is \code{"DRC_Plots"}.
+#' @param organize_by Character. Directory organization strategy:
+#'   \itemize{
+#'     \item \code{"plate"}: plots grouped by plate (default)
+#'     \item \code{"compound"}: plots grouped by compound
+#'     \item \code{"flat"}: all plots in a single directory
+#'   }
+#' @param compounds_to_plot Optional character vector of compound names to include.
+#'   If \code{NULL}, all compounds are plotted.
+#' @param plates_to_plot Optional character vector of plate names to include.
+#'   If \code{NULL}, all plates are processed.
+#' @param format Character. File format for saved plots (e.g. \code{"png"}, \code{"pdf"}).
+#' @param width Numeric. Plot width in inches.
+#' @param height Numeric. Plot height in inches.
+#' @param dpi Numeric. Plot resolution in dots per inch.
+#' @param point_color Character. Color of data points in plots.
+#' @param verbose Logical. If \code{TRUE}, prints progress and summary messages.
+#' @param show_ic50_line Logical. Whether to display IC50 vertical line.
+#' @param plot_title Logical. Whether to include plot titles.
+#' @param point_size Numeric. Size of data points in plots.
+#' @param ... Additional arguments passed to \code{plot_dose_response()}.
 #'
 #' @details
-#' This function scans all plates in the batch analysis result, identifies
-#' compounds with successful dose-response fits, and generates individual plots
-#' for each compound using \code{\link{plot_dose_response}}. The plots are saved
-#' with filenames based on compound names and organized according to the
-#' \code{organize_by} parameter.
-#'
-#' The function automatically handles different naming formats:
-#' \itemize{
-#'   \item{"Construct | Compound" format}
-#'   \item{"Construct:Compound" format}
-#'   \item{Simple compound names}
+#' The function performs the following steps:
+#' \enumerate{
+#'   \item Validates input structure and extracts plate-level results
+#'   \item Identifies compounds with successful model fits
+#'   \item Optionally filters by plate and/or compound
+#'   \item Creates directory structure for output
+#'   \item Generates plots using \code{plot_dose_response()}
+#'   \item Saves plots to disk with safe filenames
 #' }
 #'
-#' File naming convention:
+#' Compound and construct names are automatically parsed from input strings
+#' (e.g. \code{"Construct | Compound"} or \code{"Construct:Compound"} formats).
+#'
+#' Filenames are sanitized to remove invalid filesystem characters.
+#'
+#' @return
+#' Invisibly returns a list with summary information:
 #' \itemize{
-#'   \item{When \code{organize_by = "plate"}:}{ \code{compound_name.format} saved in plate subfolder}
-#'   \item{When \code{organize_by = "compound"}:}{ \code{plate_name_compound_name.format} saved in compound subfolder}
-#'   \item{When \code{organize_by = "flat"}:}{ \code{plate_name_compound_name.format} in main directory}
+#'   \item \code{total} Number of compounds processed
+#'   \item \code{successes} Number of successfully generated plots
+#'   \item \code{failures} Number of failed plots
+#'   \item \code{failed_compounds} Character vector of failed entries
+#'   \item \code{error_messages} List of error messages
+#'   \item \code{output_dir} Output directory path
+#'   \item \code{organization} Directory structure used
+#'   \item \code{point_color} Point color used in plots
+#'   \item \code{timestamp} Time of execution
 #' }
-#'
-#' @note
-#' This function requires the \pkg{ggplot2} package. If a plot fails to generate,
-#' the error is captured and the function continues processing remaining compounds.
-#'
-#' @seealso
-#' \code{\link{plot_dose_response}} for the underlying plotting function and
-#' all available aesthetic parameters;
-#' \code{\link{batch_drc_analysis}} for generating the input data.
-#'
-#' @importFrom ggplot2 ggsave
-#' @importFrom utils txtProgressBar setTxtProgressBar
 #'
 #' @examples
 #' \dontrun{
-#' # Basic usage - saves all plots organized by plate
+#' # Run batch DRC analysis first
+#' results <- batch_drc_analysis(data_list)
+#'
+#' # Save all plots organized by plate
+#' batch_save_all_drc_plots(results)
+#'
+#' # Save only selected compounds
 #' batch_save_all_drc_plots(
-#'   batch_drc_results = my_results,
-#'   output_dir = "All_Plots"
+#'   results,
+#'   compounds_to_plot = c("DrugA", "DrugB")
 #' )
 #'
-#' # Save only specific compounds, organized by compound name
+#' # Organize plots by compound
 #' batch_save_all_drc_plots(
-#'   batch_drc_results = my_results,
-#'   compounds_to_plot = c("MDCV001", "GZD824", "MLI-2"),
+#'   results,
 #'   organize_by = "compound",
-#'   output_dir = "Selected_Compounds"
-#' )
-#'
-#' # Customize plot appearance
-#' batch_save_all_drc_plots(
-#'   batch_drc_results = my_results,
-#'   output_dir = "Custom_Plots",
-#'   point_color = "blue",
-#'   point_size = 3,
-#'   show_ic50_line = TRUE,
-#'   plot_title = TRUE,  # Show automatic titles
-#'   y_limits = c(0, 100),  # Passed to plot_dose_response via ...
-#'   axis_label_size = 16,
-#'   axis_text_size = 14
-#' )
-#'
-#' # Save specific plates with custom title
-#' batch_save_all_drc_plots(
-#'   batch_drc_results = my_results,
-#'   plates_to_plot = c("plate_01", "plate_03"),
-#'   output_dir = "Selected_Plates",
-#'   plot_title = "Dose-Response Curve"
-#' )
-#'
-#' # Process only compounds from a specific construct
-#' batch_save_all_drc_plots(
-#'   batch_drc_results = my_results,
-#'   compounds_to_plot = c("MDCV001", "MDCV002", "MDCV003"),
-#'   output_dir = "LRRK2_Compounds"
+#'   format = "pdf"
 #' )
 #' }
+#'
+#' @seealso
+#' \code{\link{batch_drc_analysis}},
+#' \code{\link{plot_dose_response}}
 #'
 #' @export
 
@@ -386,7 +340,7 @@ batch_save_all_drc_plots <- function(batch_drc_results,
         plot_width = width,
         plot_height = height,
         plot_dpi = dpi,
-        point_color = point_color,  # Passando a cor dos pontos (padrão = "black")
+        point_color = point_color,
         show_ic50_line = show_ic50_line,
         verbose = FALSE,
         plot_title = plot_title,
@@ -417,7 +371,7 @@ batch_save_all_drc_plots <- function(batch_drc_results,
     message("Total compounds: ", total)
     message("Successful: ", successes)
     message("Failed: ", failures)
-    message("Point color: ", point_color)  # Mostrar a cor usada
+    message("Point color: ", point_color)
     message("Output directory: ", normalizePath(output_dir))
 
     if (failures > 0) {

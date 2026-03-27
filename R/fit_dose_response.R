@@ -260,7 +260,6 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
       vc <- v[!is.na(v)]
       if (length(vc) < 2) return(rep(NA_real_, length(v)))
       first <- vc[1]; last <- vc[length(vc)]
-      # Verificação robusta para divisão por zero
       if (!is.finite(first) || !is.finite(last) || abs(last - first) < .Machine$double.eps) {
         return(rep(NA_real_, length(v)))
       }
@@ -454,7 +453,7 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
     else if (!is.na(max_slope) && abs(max_slope) < 15) q_flags <- c(q_flags, "Shallow slope")
     if (!is.na(span_val) && abs(span_val) < 20) q_flags <- c(q_flags, "Small span")
     if (!is.na(gof_results$R_squared) && gof_results$R_squared < r_sqr_threshold) {
-      q_flags <- c(q_flags, "Low R²")
+      q_flags <- c(q_flags, "Low R2")
     }
     if (check$needs_correction) q_flags <- c(q_flags, "Params corrected")
 
@@ -637,19 +636,19 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
     cat("\n", strrep("=", 50), "\n", sep = "")
     cat("DOSE-RESPONSE ANALYSIS COMPLETE\n")
     cat(strrep("=", 50), "\n")
-    cat("  • Compounds analyzed: ", tot_n, "\n")
-    cat("  • Successful fits: ", succ_n, " (", round(succ_n/tot_n*100, 1), "%)\n", sep = "")
-    cat("  • Data used for fit: ", if(normalize) "Normalized (0-100%)" else "Original (Raw)", "\n")
+    cat("  . Compounds analyzed: ", tot_n, "\n")
+    cat("  . Successful fits: ", succ_n, " (", round(succ_n/tot_n*100, 1), "%)\n", sep = "")
+    cat("  . Data used for fit: ", if(normalize) "Normalized (0-100%)" else "Original (Raw)", "\n")
 
     if (enforce_bottom_threshold && length(threshold_affected) > 0) {
       excl <- sum(is.na(summary_table$IC50) & !is.na(summary_table$Bottom))
-      cat("  • IC50 values excluded (Bottom ≥ ", bottom_threshold, "): ", excl, "\n", sep = "")
+      cat("  . IC50 values excluded (Bottom >= ", bottom_threshold, "): ", excl, "\n", sep = "")
 
       if (verbose > 1) {
         cat("\nCOMPOUNDS WITH EXCLUDED IC50 VALUES:\n")
         for (i in seq_along(threshold_affected)) {
           bottom_val <- summary_table$Bottom[summary_table$Compound == threshold_affected[i]]
-          cat("  • ", threshold_affected[i], " (Bottom = ", round(bottom_val, 1), ")\n", sep = "")
+          cat("  . ", threshold_affected[i], " (Bottom = ", round(bottom_val, 1), ")\n", sep = "")
         }
       }
     }
@@ -659,7 +658,7 @@ fit_drc_3pl <- function(data, output_file = NULL, normalize = FALSE, verbose = T
       quality_counts <- table(summary_table$Curve_Quality)
       for (quality in names(sort(quality_counts, decreasing = TRUE))) {
         count <- quality_counts[quality]
-        cat("  • ", sprintf("%-35s: %d (%.1f%%)", quality, count, count/tot_n*100), "\n")
+        cat("  . ", sprintf("%-35s: %d (%.1f%%)", quality, count, count/tot_n*100), "\n")
       }
     }
     cat(strrep("=", 50), "\n")

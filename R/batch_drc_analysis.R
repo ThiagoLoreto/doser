@@ -495,6 +495,9 @@ batch_drc_analysis <- function(batch_results,
 
   for (i in seq_along(batch_results)) {
     plate_name <- names(batch_results)[i]
+    # Keys appended by rout_outliers_batch() -- not plates, must be skipped
+    reserved_keys <- c("outlier_summary", "skipped_summary", "params", "cleared_systematic")
+    if (plate_name %in% reserved_keys) next
     if (verbose) message(sprintf("\nProcessing %d/%d: %s", i, total_plates, plate_name))
 
     tryCatch({
